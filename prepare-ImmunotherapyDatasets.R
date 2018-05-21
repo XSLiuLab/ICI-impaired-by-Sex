@@ -187,21 +187,21 @@ Forde_clin <- read_csv("Forde_clinical_info.csv")
 Forde_mut  <- read_csv("Forde_mutation.csv")
 Forde_neos <- read_csv("Forde_neoantigens.csv")
 
-Forde_clin_clean <- Forde_clin %>% rename(Tumor_Sample_Barcode=SampleID, 
+Forde_clin_clean <- Forde_clin %>% dplyr::rename(Tumor_Sample_Barcode=SampleID, 
                                           Patient_ID=PatientID, Smoking_History=`Smoking History`,
                                           Smoking_Pack_Years = PackYears, 
                                           Histology=HistopathologicDiagnosis,
-                                          Tumor_Stage=`Pre-Treatment Clinical Tumor Stage`)
+                                          Tumor_Stage=TNM)
 Forde_neos <- Forde_neos[1:19584, -24]
-Forde_neos_sum <- Forde_neos %>% group_by(SampleID) %>% 
-                        summarise(Neoantigen_Burden=n(), 
+Forde_neos_sum <- Forde_neos %>% dplyr::group_by(SampleID) %>% 
+                        dplyr::summarise(Neoantigen_Burden=n(), 
                         HLA=paste(unique(HLA_Allele), collapse = ",")) %>% 
-                        mutate(SampleID=substr(SampleID, 1, 7)) %>% 
-                        rename(Tumor_Sample_Barcode=SampleID)
+                        dplyr::mutate(SampleID=substr(SampleID, 1, 7)) %>% 
+                        dplyr::rename(Tumor_Sample_Barcode=SampleID)
 
 Forde_sampleInfo <- dplyr::full_join(Forde_clin_clean, Forde_neos_sum, by="Tumor_Sample_Barcode")%>% setDT()
 Forde_sampleInfo <- Forde_sampleInfo %>% 
-    rename(Neoantigen = Neoantigen_Burden, Smoking_Years = Smoking_Pack_Years)
+    dplyr::rename(Neoantigen = Neoantigen_Burden, Smoking_Years = Smoking_Pack_Years)
 
 
 pattern1 <- "^chr[0-9XYM]+_[0-9]+-[0-9]+_([ACGT]{0,})_([ACGT]{0,})$"

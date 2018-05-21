@@ -81,6 +81,9 @@ p1_2 <- compareMutPlot(sampleInfo_JCO_Rizvi[Clinical_Benefit %in% c("DCB", "NDB"
 sampleInfo_Hellmann <- setDT(sampleInfo_Hellmann)
 sampleInfo_Hellmann[, Gender:=ifelse(Gender=="female", "Female", "Male")]
 p1_3 <- compareMutPlot(sampleInfo_Hellmann[Clinical_Benefit %in% c("DCB", "NDB")])
+sampleInfo_Forde <- setDT(sampleInfo_Forde)
+sampleInfo_Forde[, Gender:=ifelse(Gender=="F", "Female", "Male")]
+#compareMutPlot(sampleInfo_Forde[Clinical_Benefit %in% c("DCB", "NDB")])
 
 p2_1 <- compareMutPlot(sampleInfo_Sci_Rizvi[Clinical_Benefit %in% c("DCB", "NDB")], value = "TMB_NonsynSNP")
 p2_2 <- compareMutPlot(sampleInfo_JCO_Rizvi[Clinical_Benefit %in% c("DCB", "NDB")], value = "TMB_NonsynSNP")
@@ -90,16 +93,6 @@ p3_1 <- compareMutPlot(sampleInfo_Sci_Rizvi[Clinical_Benefit %in% c("DCB", "NDB"
 p3_2 <- compareMutPlot(sampleInfo_JCO_Rizvi[Clinical_Benefit %in% c("DCB", "NDB")], value = "TMB_NonsynVariants")
 p3_3 <- compareMutPlot(sampleInfo_Hellmann[Clinical_Benefit %in% c("DCB", "NDB")], value = "TMB_NonsynVariants")
 
-summary(sampleInfo_Sci_Rizvi[Clinical_Benefit %in% c("DCB", "NDB"), .(Gender, TMB_NonsynVariants)][Gender=="F"] )
-summary(sampleInfo_Sci_Rizvi[Clinical_Benefit %in% c("DCB", "NDB"), .(Gender, TMB_NonsynVariants)][Gender=="M"] )
-sampleInfo_Forde
-
-
-sampleInfo_Sci_Rizvi %>%  group_by(Gender) %>% 
-    dplyr::summarize(n = n(), 
-              min = min(TMB_NonsynVariants), 
-              max = max(TMB_NonsynVariants), 
-              median = median(TMB_NonsynVariants))
 
 groupSummary <- function(df, summarise_var=NULL, ...){
     summarise_var  <- enquo(summarise_var)
@@ -118,15 +111,9 @@ groupSummary <- function(df, summarise_var=NULL, ...){
 }
 
 groupSummary(sampleInfo_Sci_Rizvi, summarise_var = TMB_NonsynVariants, Gender)
-
-
-my_var <- quo(TMB_NonsynVariants)
-quo(sampleInfo_Sci_Rizvi %>%  group_by(Gender) %>% 
-    dplyr::summarize(n = n(), 
-                     min = min(!! my_var), 
-                     max = max(!! my_var), 
-                     median = median(!! my_var)))
-
+groupSummary(sampleInfo_JCO_Rizvi, summarise_var = TMB_NonsynVariants, Gender)
+groupSummary(sampleInfo_Hellmann, summarise_var = TMB_NonsynVariants, Gender)
+groupSummary(sampleInfo_Forde, summarise_var = TMB_NonsynVariants, Gender)
 
 p1 <- grid.arrange(p1_1, p1_2, p1_3, nrow=1, ncol=3)
 ggsave(filename = "Total_Mutation_asTMB_across_datasets.pdf", plot=p1, height = 3,
@@ -176,9 +163,54 @@ p5 <- ggstatsplot::ggcorrmat(
 # ggsave(filename = "compare_different_ways_for_TMB_representation.pdf", plot = p5,
 #        width = 4, height = 4)
 
+compareBoxplot <- function(df, x=NULL, y=NULL, label_name=c("p.format", "p.signif"), 
+                           method=c("wilcox.test", "t.test", "anova", "kruskai.test")){
+    label_name <- match.arg(label_name)
+    method <- match.arg(method)
+    df <- as.data.frame(df)
+    name_sort <- names(table(df[, x]))
+    df$Gender <- factor(df$Gender, levels = name_sort)
+    p <- ggboxplot(df, x=x, y=y, ggtheme = theme_pubr(base_size = 8))
+    p + stat_compare_means(label = label_name, label.x.npc = "center", method = method)
+}
+
+p6_1 <- compareBoxplot(sampleInfo_Forde, x="Gender", y="TMB_NonsynVariants")
+p6_2 <- compareBoxplot(sampleInfo_Hellmann, x="Gender", y="TMB_NonsynVariants")
+p6_3 <- compareBoxplot(sampleInfo_Sci_Rizvi, x="Gender", y="TMB_NonsynVariants")
+p6_4 <- compareBoxplot(sampleInfo_JCO_Rizvi, x="Gender", y="TMB_NonsynVariants")
+
+library(cowplot)
+p6 <- plot_grid(p6_1, p6_2, p6_3, p6_4, nrow=2, ncol=2, align = "v")
+ggsave("Compare-TMB-between-F-and-M.pdf", plot = p6, width = 5, height = 5)
+
 rm(list = ls(pattern = "^p"))
 
+##> retrieve HLA information to compute neoantigen load/quality
+generateHLAfile <- function(df, path, tsb="Tumor_Sample_Barcode", HLA="HLA"){
+    df <- as.data.frame(df)
+    Cols <- c(tsb, HLA)
+    Allcols <- colnames(df)
+    if(all(Cols %in% Allcols)){
+        df <- df[, Cols]
+        write_tsv(df, path=path)
+    }else{
+        stop("Please check your colnames.")
+    }
+}
 
-# Forde dataset has no DCB or NDB labels
-# sampleInfo_Forde <- setDT(sampleInfo_Forde) 
-# compareMutPlot(sampleInfo_Forde[Clinical_Benefit %in% c("DCB", "NDB")])
+generateHLAfile(sampleInfo_Forde, path="Rdata/Forde_HLA.tsv")
+generateHLAfile(sampleInfo_Hellmann, path="Rdata/Hellmann_HLA.tsv")
+generateHLAfile(sampleInfo_Sci_Rizvi, path="Rdata/Sci_Rizvi_HLA.tsv")
+
+##> retrieve functional mutation for neoantigen load and neoantigen quality computation
+write_tsv(Forde_maf@data, path="Rdata/NQ_Forde.maf")
+write_tsv(Hellmann_maf@data, path="Rdata/NQ_Hellmann.maf")
+write_tsv(Science_Rizvi_maf@data, path="Rdata/NQ_Sci_Rizvi.maf")
+
+
+##> cache data and code for now
+save(sampleInfo_Forde, sampleInfo_Hellmann, sampleInfo_JCO_Rizvi, sampleInfo_Sci_Rizvi,
+     Forde_maf, Hellmann_maf, JCO_Rizvi_maf, Science_Rizvi_maf, ref_19genome, ref_38genome,
+     autoMutSig, autoTumorHeter, file = "Rdata/cache_data_code.RData")
+rm(list = ls()); gc()
+        
