@@ -140,6 +140,34 @@ summarySEwithin <- function(data=NULL, measurevar, betweenvars=NULL, withinvars=
     merge(datac, ndatac)
 }
 
+
+
+
+##################################
+# Functions used for prepare data#
+##################################
+##> Mutation Signature Analysis
+
+autoMutSig <- function(maf, ref_genome, prefix="chr", add=TRUE, ignoreChr="chrM", useSyn=TRUE, n=6, nTry=6, plotBestFitRes=FALSE, minMut=5, useCNV=FALSE){
+    tnm <- maftools::trinucleotideMatrix(maf=maf, ref_genome = ref_genome, ignoreChr = ignoreChr, prefix = prefix, add = add, useSyn = useSyn)
+    signature <- maftools::extractSignatures(tnm, nTry = nTry, plotBestFitRes = plotBestFitRes)
+    se <- maftools::signatureEnrichment(maf=maf, sig_res = signature)
+    mut_signatures <- c(tnm, signature, se)
+    return(mut_signatures)
+}
+
+##> Infer Heterogeneity for Tumor MAF
+autoTumorHeter <- function(maf, tsb="ALL", top=5, vafCol=NULL, segFile=NULL, ignChr=NULL, minVaf=0, maxVaf=1, useSyn=FALSE){
+    if(tsb=="ALL"){
+        tsb=maftools::getSampleSummary(maf)$Tumor_Sample_Barcode
+    }
+    het <- maftools::inferHeterogeneity(maf=maf, tsb=tsb, top=top, segFile=segFile, ignChr=ignChr, minVaf=minVaf, maxVaf=maxVaf, useSyn=useSyn)
+    math <- het$clusterData %>% select(Tumor_Sample_Barcode, MATH) %>% distinct()
+    res <- list(heter_data=het, MATH=math)
+    return(res)
+}
+
+
 # function summary data from Neoantigen Quality file
 summaryNQres <- function(input=NULL){
     options(stringsAsFactors=FALSE)
@@ -183,29 +211,85 @@ summaryMergedNeos <- function(input=NULL){
     return(res)
 }
 
-
-##################################
-# Functions used for prepare data#
-##################################
-##> Mutation Signature Analysis
-
-autoMutSig <- function(maf, ref_genome, prefix="chr", add=TRUE, ignoreChr="chrM", useSyn=TRUE, n=6, nTry=6, plotBestFitRes=FALSE, minMut=5, useCNV=FALSE){
-    tnm <- maftools::trinucleotideMatrix(maf=maf, ref_genome = ref_genome, ignoreChr = ignoreChr, prefix = prefix, add = add, useSyn = useSyn)
-    signature <- maftools::extractSignatures(tnm, nTry = nTry, plotBestFitRes = plotBestFitRes)
-    se <- maftools::signatureEnrichment(maf=maf, sig_res = signature)
-    mut_signatures <- c(tnm, signature, se)
-    return(mut_signatures)
+# get Tumor Mutation Burden of samples 
+getSampleTMB <- function(maf){
+    maf.silent <- maf@maf.silent
+    sample.silent <- maf.silent[,.N, .(Tumor_Sample_Barcode)]
+    sample.nonsilent <- getSampleSummary(maf)
+    res <- dplyr::full_join(sample.silent, sample.nonsilent, by="Tumor_Sample_Barcode")
+    res %>% mutate(TMB_Total=ifelse(!is.na(N), N+total, total), 
+                   TMB_NonsynSNP=Missense_Mutation+Nonsense_Mutation,
+                   TMB_NonsynVariants=total) %>% select(TMB_Total:TMB_NonsynVariants, Tumor_Sample_Barcode)
 }
 
-##> Infer Heterogeneity for Tumor MAF
-autoTumorHeter <- function(maf, tsb="ALL", top=5, vafCol=NULL, segFile=NULL, ignChr=NULL, minVaf=0, maxVaf=1, useSyn=FALSE){
-    if(tsb=="ALL"){
-        tsb=maftools::getSampleSummary(maf)$Tumor_Sample_Barcode
+##> retrieve HLA information to compute neoantigen load/quality
+generateHLAfile <- function(df, path, tsb="Tumor_Sample_Barcode", HLA="HLA"){
+    df <- as.data.frame(df)
+    Cols <- c(tsb, HLA)
+    Allcols <- colnames(df)
+    if(all(Cols %in% Allcols)){
+        df <- df[, Cols]
+        write_tsv(df, path=path)
+    }else{
+        stop("Please check your colnames.")
     }
-    het <- maftools::inferHeterogeneity(maf=maf, tsb=tsb, top=top, segFile=segFile, ignChr=ignChr, minVaf=minVaf, maxVaf=maxVaf, useSyn=useSyn)
-    math <- het$clusterData %>% select(Tumor_Sample_Barcode, MATH) %>% distinct()
-    res <- list(heter_data=het, MATH=math)
-    return(res)
 }
 
+###############################################
+# Functions used for analyze or visulize data #
+###############################################
 
+# compare samples using boxplot and add significant levels
+compareBoxplot <- function(df, x=NULL, y=NULL, label_name=c("p.format", "p.signif"), 
+                           method=c("wilcox.test", "t.test", "anova", "kruskai.test")){
+    label_name <- match.arg(label_name)
+    method <- match.arg(method)
+    df <- as.data.frame(df)
+    name_sort <- names(table(df[, x]))
+    df$Gender <- factor(df$Gender, levels = name_sort)
+    p <- ggboxplot(df, x=x, y=y, ggtheme = theme_pubr(base_size = 8))
+    p + stat_compare_means(label = label_name, label.x.npc = "center", method = method)
+}
+
+# compare mutation profile in two-level group variable
+compareMutPlot <- function(dat, group1="Gender", group2="Clinical_Benefit", value="TMB_Total", label_name="p.signif"){
+    require(ggpubr)
+    dat <- as.data.frame(dat)
+    #my_comparisons <- combn(names(table(dat[, group2])), 2, simplify = FALSE)
+    my_comparisons  <- list(c("DCB", "NDB"))
+    
+    p <- ggboxplot(dat, x = group1, y = value,
+                   color = group2, palette = "jco",
+                   add = "jitter", shape = group2, font.label = list(size=6), 
+                   ggtheme = theme_pubr(base_size = 8)) 
+    
+    p + stat_compare_means(aes_string(group=group2), label = label_name, 
+                           method = "wilcox.test")        # Add pairwise comparisons p-value
+    # stat_compare_means(label.x.npc = "center", 
+    #                    label.y.npc = "top" )                   # Add global p-value
+    
+    # res <- summarySE(data = dat, measurevar = value, groupvars = c(group1, group2))
+    # ggplot(res, aes_string(x=group1, y=value, fill=group2)) + 
+    #      geom_bar(position = position_dodge() ,stat = "identity") +
+    #      geom_errorbar(aes_string(ymin=paste0(value, "-se"), ymax=paste0(value, "+se")),
+    #                    width=.2,
+    #                    position = position_dodge(.9)) + 
+    #      theme_bw()  + scale_fill_npg()
+}
+
+# summary data by group variables, include min, max and median
+groupSummary <- function(df, summarise_var=NULL, ...){
+    summarise_var  <- enquo(summarise_var)
+    if(summarise_var != quo(NULL)){
+        group_var <- quos(...)
+        #print(summarise_var)
+        df %>% 
+            group_by(!!! group_var) %>% 
+            dplyr::summarize(n = n(), 
+                             min = min(!!summarise_var), 
+                             max = max(!!summarise_var), 
+                             median = median(!!summarise_var))
+    }else{
+        stop("summarise_var can not be null!")
+    }
+}

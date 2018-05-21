@@ -11,32 +11,8 @@ library(maftools)
 
 # ref_38genome = "G:/biodata/reference/hg38.fa"
 # ref_19genome = "G:/biodata/reference/hg19.fa"
-
-
-##################################
-# Functions used for prepare data#
-##################################
-##> Mutation Signature Analysis
-
-autoMutSig <- function(maf, ref_genome, prefix="chr", add=TRUE, ignoreChr="chrM", useSyn=TRUE, n=6, nTry=6, plotBestFitRes=FALSE, minMut=5, useCNV=FALSE){
-    tnm <- maftools::trinucleotideMatrix(maf=maf, ref_genome = ref_genome, ignoreChr = ignoreChr, prefix = prefix, add = add, useSyn = useSyn)
-    signature <- maftools::extractSignatures(tnm, nTry = nTry, plotBestFitRes = plotBestFitRes)
-    se <- maftools::signatureEnrichment(maf=maf, sig_res = signature)
-    mut_signatures <- c(tnm, signature, se)
-    return(mut_signatures)
-}
-
-##> Infer Heterogeneity for Tumor MAF
-autoTumorHeter <- function(maf, tsb="ALL", top=5, vafCol=NULL, segFile=NULL, ignChr=NULL, minVaf=0, maxVaf=1, useSyn=FALSE){
-    if(tsb=="ALL"){
-        tsb=maftools::getSampleSummary(maf)$Tumor_Sample_Barcode
-    }
-    het <- maftools::inferHeterogeneity(maf=maf, tsb=tsb, top=top, segFile=segFile, ignChr=ignChr, minVaf=minVaf, maxVaf=maxVaf, useSyn=useSyn)
-    math <- het$clusterData %>% select(Tumor_Sample_Barcode, MATH) %>% distinct()
-    res <- list(heter_data=het, MATH=math)
-    return(res)
-}
-
+# load functions
+source("C:/Users/wangshx/Desktop/data/neoQ/Allfunctions.R")
 
 ##################################
 # clean the datasets one by one ##
