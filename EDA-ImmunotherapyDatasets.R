@@ -11,6 +11,7 @@ library(survminer)
 ref_38genome = "G:/biodata/reference/hg38.fa"
 ref_19genome = "G:/biodata/reference/hg19.fa"
 
+setwd("G:/biodata/immunotherapyDatasets/")
 # load functions
 source("C:/Users/wangshx/Desktop/data/neoQ/Allfunctions.R")
 
@@ -49,11 +50,12 @@ sampleInfo_Hellmann[, Gender:=ifelse(Gender=="female", "Female", "Male")]
 p1_3 <- compareMutPlot(sampleInfo_Hellmann[Clinical_Benefit %in% c("DCB", "NDB")])
 sampleInfo_Forde <- setDT(sampleInfo_Forde)
 sampleInfo_Forde[, Gender:=ifelse(Gender=="F", "Female", "Male")]
-#compareMutPlot(sampleInfo_Forde[Clinical_Benefit %in% c("DCB", "NDB")])
+compareMutPlot(sampleInfo_Forde[Clinical_Benefit %in% c("DCB", "NDB")])
 
-p2_1 <- compareMutPlot(sampleInfo_Sci_Rizvi[Clinical_Benefit %in% c("DCB", "NDB")], value = "TMB_NonsynSNP")
-p2_2 <- compareMutPlot(sampleInfo_JCO_Rizvi[Clinical_Benefit %in% c("DCB", "NDB")], value = "TMB_NonsynSNP")
-p2_3 <- compareMutPlot(sampleInfo_Hellmann[Clinical_Benefit %in% c("DCB", "NDB")], value = "TMB_NonsynSNP")
+p2_1 <- compareMutPlot(subset(sampleInfo_Sci_Rizvi, Clinical_Benefit %in% c("DCB", "NDB")), value = "TMB_NonsynSNP")
+p2_2 <- compareMutPlot(subset(sampleInfo_JCO_Rizvi, Clinical_Benefit %in% c("DCB", "NDB")), value = "TMB_NonsynSNP")
+p2_3 <- compareMutPlot(subset(sampleInfo_Hellmann, Clinical_Benefit %in% c("DCB", "NDB")), value = "TMB_NonsynSNP")
+p2_4 <- compareMutPlot(subset(sampleInfo_Forde, Clinical_Benefit %in% c("DCB", "NDB")), value = "TMB_NonsynSNP")
 
 p3_1 <- compareMutPlot(sampleInfo_Sci_Rizvi[Clinical_Benefit %in% c("DCB", "NDB")], value = "TMB_NonsynVariants")
 p3_2 <- compareMutPlot(sampleInfo_JCO_Rizvi[Clinical_Benefit %in% c("DCB", "NDB")], value = "TMB_NonsynVariants")
