@@ -1,3 +1,4 @@
+setwd("G:/biodata/immunotherapyDatasets/")
 library(ggpubr)
 load("Rdata/sampleInfo_cache.RData")
 
@@ -62,7 +63,7 @@ LUAD_TMB2 <-  dplyr::full_join(LUAD_TMB, LUAD_clin, by="Tumor_Sample_Barcode") %
 
 CV.nonsyn <- list()
 CV.nonsyn$Sci_Rizvi <- calcCV(sampleInfo_Sci_Rizvi, target = TMB_NonsynSNP, Gender)
-CV.nonsyn$JCO_Rizvi <- calcCV(sampleInfo_JCO_Rizvi, target = TMB_NonsynSNP, Gender)
+CV.nonsyn$JCO_Rizvi <- calcCV(sampleInfo_JCO_Rizvi, target = TMB_NonsynSNP, Gender, Gene_Panel)
 CV.nonsyn$Hellmann  <- calcCV(sampleInfo_Hellmann, target = TMB_NonsynSNP, Gender)
 CV.nonsyn$Forde     <- calcCV(sampleInfo_Forde, target = TMB_NonsynSNP, Gender)
 
@@ -72,70 +73,225 @@ calcCV(sampleInfo_Sci_Rizvi, target = NeoCounts, Gender)
 calcCV(sampleInfo_Hellmann, target = NeoCounts, Gender)
 calcCV(sampleInfo_Forde, target = NeoCounts, Gender)
 
-## ROC plot and analysis
-calcROC <- function(.data, predict_var, target, group_var, positive="DCB"){
-    # predic_var here must be a numeric value
-    require(tidyverse)
-    predict_var <- enquo(predict_var)
+
+# plot ROC curve
+plotROC <- function(.data, predict_col, target, group, positive="DCB", all=TRUE){
+    if(!(require(tidyverse) & require(plotROC))){
+         stop("--> tidyverse and plotROC packages are required..")
+    } 
+    
+    predict_col <- enquo(predict_col)
     target <- enquo(target)
-    group_var <- enquo(group_var)
+    group  <- enquo(group)
     
-    groups <- .data %>% filter(!is.na(!! predict_var)) %>% select(!! group_var) %>% 
-        unlist() %>% table() %>% names()
+    predictN <- quo_name(predict_col)
+    groupN   <- quo_name(group)
     
-    total_res <- list()
-    # process groups one by one
-    j <- 1
-    for (i in groups){
-        df <- list()
-        df <- .data %>% filter(!is.na(!! predict_var), !! group_var == i) %>%
-            arrange(desc(!! predict_var)) %>% 
-            mutate(isPositive = ifelse(!! target == positive, 1, 0))
-        
-        # select a threshold, calculate true positive and false positive value
-        ths <- df %>% select(!! predict_var) %>% unlist
-        
-        mat <- base::sapply(ths, function(th){
-            # true positive
-            tp <- df %>% filter(!! predict_var >= th) %>% filter(isPositive == 1) %>% nrow
-            # false positive
-            fp <- df %>% filter(!! predict_var >= th) %>% filter(isPositive == 0) %>% nrow
-            # true negative
-            tn <- df %>% filter(!! predict_var < th) %>% filter(isPositive == 0) %>% nrow
-            # false negative
-            fn <- df %>% filter(!! predict_var < th) %>% filter(isPositive == 1) %>% nrow
-            
-            # true positive rate
-            tpr <- tp / (tp + fn)
-            # false positive rate
-            fpr <- fp / (fp + tn)
-            
-            return(c(tp, fp, tn, fn, tpr, fpr))
-            # combine
-        })
-        
-        res <- t(mat)
-        res <- data.frame(res)
-        # fake a (0, 0) point
-        res <- rbind(c(rep(NA, 4), 0, 0), res)
-        colnames(res) <- c("tp", "fp", "tn", "fn", "tpr", "fpr")
-        res$Group <- i
-        total_res[[j]] <- res
-        j <- j + 1
+    df <- .data %>% dplyr::select(!! predict_col, !! target, !! group) %>%
+        mutate(targetN = ifelse(!! target == positive, 1, 0)) %>% as.data.frame()
+    
+    df2 <- df 
+    df2[, groupN] <- "ALL"
+    
+    df <- rbind(df, df2)
+    
+    p  <- df %>%  ggplot(aes_string(m = predictN, 
+                                    d = "targetN",
+                                    color = groupN)) + geom_roc(show.legend = TRUE, labels=FALSE)
+    p <- p + ggpubr::theme_classic2()
+    
+    # p <- direct_label(p) + ggpubr::theme_classic2()
+    # annotate("text", x = .75, y = .25, 
+    #          label = paste("AUC =", round(calc_auc(basicplot)$AUC, 2)))
+    # pairplot <- ggplot(longtest, aes(d = D, m = M, color = name)) + 
+    #     geom_roc(show.legend = FALSE) + style_roc()
+    # direct_label(pairplot)
+    
+    ng <- levels(factor(df[, groupN]))
+    if(length(ng) == 3){
+        auc <- calc_auc(p)$AUC
+        names(auc) <- ng
+        auc <- base::sort(auc, decreasing = TRUE)
+        p <- p + annotate("text", x = .75, y = .25, 
+                          label = paste(names(auc)[1], " AUC =", round(auc[1], 3), "\n",
+                                        names(auc)[2], " AUC =", round(auc[2], 3), "\n",
+                                        names(auc)[3], " AUC =", round(auc[3], 3), "\n"))
     }
     
-    dat <- base::Reduce(rbind, total_res)
-    return(dat)
+    p + xlab("1 - Specificity") + ylab("Sensitivity") + 
+        scale_x_continuous(expand = c(0, 0)) + scale_y_continuous(expand = c(0, 0))
 }
 
-roc_Sci_Rizvi <- calcROC(sampleInfo_Sci_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
-ggline(data = roc_Sci_Rizvi, x = "fpr", y = "tpr", linetype = "Group", shape = "Group")
+# tmb ROC
+tmbROC_SciRizvi <- plotROC(sampleInfo_Sci_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
+ggsave("tmbROC_SciRizvi.pdf", plot=tmbROC_SciRizvi, width=5, height=4)
+tmbROC_JCORizvi <- plotROC(sampleInfo_JCO_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
+ggsave("tmbROC_JCORizvi.pdf", plot=tmbROC_JCORizvi, width=5, height=4)
+tmbROC_Hellmann <- plotROC(sampleInfo_Hellmann, TMB_NonsynSNP, Clinical_Benefit, Gender)
+ggsave("tmbROC_Hellmann.pdf", plot=tmbROC_Hellmann, width=5, height=4)
+tmbROC_Forde <- plotROC(sampleInfo_Forde, TMB_NonsynSNP, Clinical_Benefit, Gender)
+ggsave("tmbROC_Forde.pdf", plot=tmbROC_Forde, width=5, height=4)
 
-roc_JCO_Rizvi <- calcROC(sampleInfo_JCO_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
-ggline(data = roc_JCO_Rizvi, x = "fpr", y = "tpr", linetype = "Group", shape = "Group")
+tmbROC_JCORizvi_IMPACT341 <- plotROC(sampleInfo_JCO_Rizvi[Gene_Panel=="IMPACT341"], TMB_NonsynSNP,
+                           Clinical_Benefit, Gender)
+tmbROC_JCORizvi_IMPACT410 <- plotROC(sampleInfo_JCO_Rizvi[Gene_Panel=="IMPACT410"], TMB_NonsynSNP,
+                                     Clinical_Benefit, Gender)
+tmbROC_JCORizvi_IMPACT468 <- plotROC(sampleInfo_JCO_Rizvi[Gene_Panel=="IMPACT468"], TMB_NonsynSNP,
+                                     Clinical_Benefit, Gender)
 
-roc_Hellmann <- calcROC(sampleInfo_Hellmann, TMB_NonsynSNP, Clinical_Benefit, Gender)
-ggline(data = roc_Hellmann, x = "fpr", y = "tpr", linetype = "Group", shape = "Group")
+tmbROC_JCORizvi_com3 <- cowplot::plot_grid(tmbROC_JCORizvi_IMPACT341, tmbROC_JCORizvi_IMPACT410, tmbROC_JCORizvi_IMPACT468,
+                   nrow = 3, align = 'v')
+ggsave("tmbROC_JCORizvi_com3.pdf", plot=tmbROC_JCORizvi_com3, width=5, height=12)
 
-roc_Forde <- calcROC(sampleInfo_Forde, TMB_NonsynSNP, Clinical_Benefit, Gender)
-ggline(data = roc_Forde, x = "fpr", y = "tpr", linetype = "Group", shape = "Group")
+tmbROC_JCORizvi_com2 <- cowplot::plot_grid(tmbROC_JCORizvi_IMPACT341, tmbROC_JCORizvi_IMPACT410, 
+                                           nrow = 1, align = 'h')
+ggsave("tmbROC_JCORizvi_com2.pdf", plot=tmbROC_JCORizvi_com2, width=10, height=4)
+
+# neoantigen ROC
+neoROC_SciRizvi <- plotROC(sampleInfo_Sci_Rizvi, NeoCounts, Clinical_Benefit, Gender)
+ggsave("neoROC_SciRizvi.pdf", plot=neoROC_SciRizvi, width=5, height=4)
+
+neoROC_Hellmann <- plotROC(sampleInfo_Hellmann, NeoCounts, Clinical_Benefit, Gender)
+ggsave("neoROC_Hellmann.pdf", plot=neoROC_Hellmann, width=5, height=4)
+neoROC_Forde <- plotROC(sampleInfo_Forde, NeoCounts, Clinical_Benefit, Gender)
+ggsave("neoROC_Forde.pdf", plot=neoROC_Forde, width=5, height=4)
+
+
+rm(list = ls(pattern = "^tmb|^roc|^neo"))
+
+
+# compare mutation between Gender in TCGA dataset
+load("C:/Users/wangshx/Desktop/data/TCGA_LUAD_Maf.RData")
+
+LUAD_TMB <- getSampleTMB(luad_maf)
+LUAD_clin <- luad_maf@clinical.data %>% select(Tumor_Sample_Barcode, gender) %>% 
+    rename(Gender = gender) %>%  mutate(Gender = ifelse(Gender=="MALE", "Male", "Female"))
+                                        
+LUAD_TMB2 <-  dplyr::full_join(LUAD_TMB, LUAD_clin, by="Tumor_Sample_Barcode") %>% 
+    filter(Gender %in% c("Male", "Female"))
+
+LUAD_TMB3 <- LUAD_TMB2 %>% mutate(TMB_Status = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP)[4],
+                                         "High", ifelse(TMB_NonsynSNP <= quantile(TMB_NonsynSNP)[2],
+                                                      "Low", "Mid"))) %>% filter(TMB_Status != "Mid")
+
+
+LUAD_TMB3 <- LUAD_TMB2 %>% mutate(TMB_Status = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP, 0.75),
+                                                      "High", ifelse(TMB_NonsynSNP <= quantile(TMB_NonsynSNP, 0.25),
+                                                                     "Low", "Mid"))) %>% filter(TMB_Status != "Mid")
+
+LUAD_TMB3 %>% group_by(Gender) %>% 
+    summarise(N=n(), N_DOWN=length(which(TMB_Status=="Low")), N_UP=length(which(TMB_Status=="High")))
+
+rm(luad_maf); gc()
+# load gene levels
+load("C:/Users/wangshx/Desktop/data/summary_of_genes.RData")
+selt_genes <- GeneSummary$Expr[GeneSymbol %in% c("PDCD1", "CD274", "PDCD1LG2", "CTLA4")]
+
+selt_genes <- selt_genes %>% 
+    gather(Tumor_Sample_Barcode, mvalue, starts_with("TCGA")) %>% spread(GeneSymbol, mvalue) %>% 
+    rename(PD1 = PDCD1, PDL1 = CD274, PDL2 = PDCD1LG2)
+
+# 
+LUAD_TMB3$Tumor_Sample_Barcode <- paste0(LUAD_TMB3$Tumor_Sample_Barcode, "-01")
+
+luad_merge <- dplyr::left_join(LUAD_TMB3, selt_genes, by="Tumor_Sample_Barcode")
+luad_info <- LUAD_TMB2 %>% 
+    mutate(Tumor_Sample_Barcode = paste0(Tumor_Sample_Barcode, "-01") )%>%
+    dplyr::left_join(y= selt_genes, by="Tumor_Sample_Barcode")
+
+ggstatsplot::ggcorrmat(
+    data = luad_info,
+    corr.method = "spearman",                # correlation method
+    sig.level = 0.05,                        # threshold of significance
+    cor.vars = c(TMB_NonsynSNP, PD1, PDL1, PDL2, CTLA4),     # a range of variables can be selected  
+    cor.vars.names = c("TMB", "PD1 expression", "PDL1 expression", "PDL2 expression", "CTLA4"),
+    #subtitle = "Iris dataset by Anderson",
+    caption = expression(
+        paste(
+            italic("Note"),
+            ": X denotes correlation non-significant at ",
+            italic("p "),
+            "< 0.05; adjusted alpha"
+        )
+    ))
+
+luad_info2 <- luad_info %>% mutate(TMB_Status = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP)[4],
+                                         "High", ifelse(TMB_NonsynSNP <= quantile(TMB_NonsynSNP)[2],
+                                                        "Low", "Mid"))) 
+
+compareBoxplot(luad_info2 %>% filter(TMB_Status != "Mid"),
+               x = "TMB_Status", y = "PD1")
+compareBoxplot(luad_info2 %>% filter(TMB_Status != "Mid"),
+               x = "TMB_Status", y = "PDL1")
+compareBoxplot(luad_info2 %>% filter(TMB_Status != "Mid"),
+               x = "TMB_Status", y = "PDL2")
+compareBoxplot(luad_info2 %>% filter(TMB_Status != "Mid"),
+               x = "TMB_Status", y = "CTLA4")
+
+# test top 10 percent 
+top10_male <- luad_info2 %>% filter(Gender=="Male") %>% 
+    mutate(MS = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP, probs = 0.75) ,"Male-Top10%", "NO")) %>%
+               filter(MS != "NO")
+top10_female <- luad_info2 %>% filter(Gender=="Female") %>% 
+    mutate(MS = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP, probs = 0.75) ,"Female-Top10%", "NO")) %>%
+    filter(MS != "NO")
+
+top10 <- rbind(top10_female, top10_male)
+compareMutPlot(top10, group1="MS", group2 = "Gender", value = "PD1",  label_name = "p.format", method = "t.test")
+compareMutPlot(top10, group1="MS", group2 = "Gender", value = "PDL1",  label_name = "p.format", method = "t.test")
+compareMutPlot(top10, group1="MS", group2 = "Gender", value = "PDL2",  label_name = "p.format", method = "t.test")
+compareMutPlot(top10, group1="MS", group2 = "Gender", value = "CTLA4",  label_name = "p.format", method = "t.test")
+
+
+compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "PD1",  label_name = "p.format", method = "t.test")
+compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "PDL1", label_name = "p.format", method = "t.test")
+compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "PDL2", label_name = "p.format", method = "t.test")
+compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "CTLA4", label_name = "p.format", method = "t.test")
+
+
+compareMutPlot(luad_merge, group2="TMB_Status", group1 = "Gender", value = "PD1",  label_name = "p.format", method = "t.test")
+compareMutPlot(luad_merge, group2="TMB_Status", group1 = "Gender", value = "PDL1", label_name = "p.format", method = "t.test")
+compareMutPlot(luad_merge, group2="TMB_Status", group1 = "Gender", value = "PDL2", label_name = "p.format", method = "t.test")
+
+
+
+## test PDL1 expression prediction result, use Hellmann etc. and JCO Rizvi etc. datasets
+pdl1_hellmann <- sampleInfo_Hellmann %>% filter(PDL1_Expression != "Unknown") %>% 
+    mutate(PDL1_Expression = as.numeric(PDL1_Expression))
+pdl1_hellmann %>% group_by(Gender) %>% summarise(N=n())
+pdl1ROC_Hellmann <- plotROC(pdl1_hellmann, PDL1_Expression, Clinical_Benefit, Gender)
+ggsave("pdl1ROC_Hellmann.pdf", plot=pdl1ROC_Hellmann, width=5, height=4)
+
+pdl1_jco <- sampleInfo_JCO_Rizvi %>% filter(!is.na(PDL1_Score)) 
+pdl1_jco %>% group_by(Gender) %>% summarise(N=n())
+pdl1ROC_jco <- plotROC(pdl1_jco, PDL1_Score, Clinical_Benefit, Gender)
+ggsave("pdl1ROC_JCO_Rizvi.pdf", plot=pdl1ROC_jco, width=5, height=4)
+
+
+## expand to MELA datasets
+MELA_Cell <- read_csv("MELA_cell.csv")
+MELA_Science <- read_csv("MELA_science.csv")
+
+plotROC(MELA_Cell, mutation_load, Response, Gender, positive = "R")
+
+
+# t <- plotROC(sampleInfo_Sci_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
+# 
+# plotROC(sampleInfo_Sci_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
+# plotROC(sampleInfo_Hellmann, TMB_NonsynSNP, Clinical_Benefit, Gender)
+# 
+# ggsave("C:/Users/wangshx/Desktop/exam_ROC.pdf", plot=t, width=5, height=4)
+
+# roc_Sci_Rizvi <- calcROC(sampleInfo_Sci_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
+# ggpubr::ggline(data = roc_Sci_Rizvi, x = "fpr", y = "tpr", linetype = "Group", shape = "Group")
+# 
+# roc_JCO_Rizvi <- calcROC(sampleInfo_JCO_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
+# ggline(data = roc_JCO_Rizvi, x = "fpr", y = "tpr", linetype = "Group", shape = "Group")
+# 
+# roc_Hellmann <- calcROC(sampleInfo_Hellmann, TMB_NonsynSNP, Clinical_Benefit, Gender)
+# ggline(data = roc_Hellmann, x = "fpr", y = "tpr", linetype = "Group", shape = "Group")
+# 
+# roc_Forde <- calcROC(sampleInfo_Forde, TMB_NonsynSNP, Clinical_Benefit, Gender)
+# ggline(data = roc_Forde, x = "fpr", y = "tpr", linetype = "Group", shape = "Group")
+
+# rm(list=ls(pattern = "^p|^roc"))

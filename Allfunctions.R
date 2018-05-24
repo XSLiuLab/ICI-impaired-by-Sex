@@ -252,7 +252,8 @@ compareBoxplot <- function(df, x=NULL, y=NULL, label_name=c("p.format", "p.signi
 }
 
 # compare mutation profile in two-level group variable
-compareMutPlot <- function(dat, group1="Gender", group2="Clinical_Benefit", value="TMB_Total", label_name="p.signif"){
+compareMutPlot <- function(dat, group1="Gender", group2="Clinical_Benefit", 
+                           value="TMB_Total", label_name="p.signif", method = "wilcox.test"){
     require(ggpubr)
     dat <- as.data.frame(dat)
     #my_comparisons <- combn(names(table(dat[, group2])), 2, simplify = FALSE)
@@ -262,10 +263,10 @@ compareMutPlot <- function(dat, group1="Gender", group2="Clinical_Benefit", valu
     p <- ggboxplot(dat, x = group1, y = value,
                    color = group2, palette = "jco",
                    add = "jitter", shape = group2, font.label = list(size=6), 
-                   ggtheme = theme_pubr(base_size = 8)) 
+                   ggtheme = theme_pubr(base_size = 8)) + theme(plot.title = element_text(hjust = 0.5))
     
     p + stat_compare_means(aes_string(group=group2), label = label_name, 
-                           method = "wilcox.test")        # Add pairwise comparisons p-value
+                           method = method)        # Add pairwise comparisons p-value
     # stat_compare_means(label.x.npc = "center", 
     #                    label.y.npc = "top" )                   # Add global p-value
     
@@ -293,4 +294,60 @@ groupSummary <- function(df, summarise_var=NULL, ...){
     }else{
         stop("summarise_var can not be null!")
     }
+}
+
+## ROC plot and analysis
+calcROC <- function(.data, predict_var, target, group_var, positive="DCB"){
+    # predic_var here must be a numeric value
+    require(tidyverse)
+    predict_var <- enquo(predict_var)
+    target <- enquo(target)
+    group_var <- enquo(group_var)
+    
+    groups <- .data %>% filter(!is.na(!! predict_var)) %>% select(!! group_var) %>% 
+        unlist() %>% table() %>% names()
+    
+    total_res <- list()
+    # process groups one by one
+    j <- 1
+    for (i in groups){
+        df <- list()
+        df <- .data %>% filter(!is.na(!! predict_var), !! group_var == i) %>%
+            arrange(desc(!! predict_var)) %>% 
+            mutate(isPositive = ifelse(!! target == positive, 1, 0))
+        
+        # select a threshold, calculate true positive and false positive value
+        ths <- df %>% select(!! predict_var) %>% unlist
+        
+        mat <- base::sapply(ths, function(th){
+            # true positive
+            tp <- df %>% filter(!! predict_var >= th) %>% filter(isPositive == 1) %>% nrow
+            # false positive
+            fp <- df %>% filter(!! predict_var >= th) %>% filter(isPositive == 0) %>% nrow
+            # true negative
+            tn <- df %>% filter(!! predict_var < th) %>% filter(isPositive == 0) %>% nrow
+            # false negative
+            fn <- df %>% filter(!! predict_var < th) %>% filter(isPositive == 1) %>% nrow
+            
+            # true positive rate
+            tpr <- tp / (tp + fn)
+            # false positive rate
+            fpr <- fp / (fp + tn)
+            
+            return(c(tp, fp, tn, fn, tpr, fpr))
+            # combine
+        })
+        
+        res <- t(mat)
+        res <- data.frame(res)
+        # fake a (0, 0) point
+        res <- rbind(c(rep(NA, 4), 0, 0), res)
+        colnames(res) <- c("tp", "fp", "tn", "fn", "tpr", "fpr")
+        res$Group <- i
+        total_res[[j]] <- res
+        j <- j + 1
+    }
+    
+    dat <- base::Reduce(rbind, total_res)
+    return(dat)
 }
