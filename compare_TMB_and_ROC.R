@@ -175,9 +175,9 @@ LUAD_TMB3 <- LUAD_TMB2 %>% mutate(TMB_Status = ifelse(TMB_NonsynSNP >= quantile(
                                                       "Low", "Mid"))) %>% filter(TMB_Status != "Mid")
 
 
-LUAD_TMB3 <- LUAD_TMB2 %>% mutate(TMB_Status = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP, 0.75),
-                                                      "High", ifelse(TMB_NonsynSNP <= quantile(TMB_NonsynSNP, 0.25),
-                                                                     "Low", "Mid"))) %>% filter(TMB_Status != "Mid")
+# LUAD_TMB3 <- LUAD_TMB2 %>% mutate(TMB_Status = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP, 0.75),
+#                                                       "High", ifelse(TMB_NonsynSNP <= quantile(TMB_NonsynSNP, 0.25),
+#                                                                      "Low", "Mid"))) %>% filter(TMB_Status != "Mid")
 
 LUAD_TMB3 %>% group_by(Gender) %>% 
     summarise(N=n(), N_DOWN=length(which(TMB_Status=="Low")), N_UP=length(which(TMB_Status=="High")))
@@ -192,6 +192,7 @@ selt_genes <- selt_genes %>%
     rename(PD1 = PDCD1, PDL1 = CD274, PDL2 = PDCD1LG2)
 
 # 
+# LUAD_TMB3 <- LUAD_TMB2
 LUAD_TMB3$Tumor_Sample_Barcode <- paste0(LUAD_TMB3$Tumor_Sample_Barcode, "-01")
 
 luad_merge <- dplyr::left_join(LUAD_TMB3, selt_genes, by="Tumor_Sample_Barcode")
@@ -228,19 +229,43 @@ compareBoxplot(luad_info2 %>% filter(TMB_Status != "Mid"),
 compareBoxplot(luad_info2 %>% filter(TMB_Status != "Mid"),
                x = "TMB_Status", y = "CTLA4")
 
-# test top 10 percent 
-top10_male <- luad_info2 %>% filter(Gender=="Male") %>% 
-    mutate(MS = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP, probs = 0.75) ,"Male-Top10%", "NO")) %>%
-               filter(MS != "NO")
-top10_female <- luad_info2 %>% filter(Gender=="Female") %>% 
-    mutate(MS = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP, probs = 0.75) ,"Female-Top10%", "NO")) %>%
-    filter(MS != "NO")
 
-top10 <- rbind(top10_female, top10_male)
-compareMutPlot(top10, group1="MS", group2 = "Gender", value = "PD1",  label_name = "p.format", method = "t.test")
-compareMutPlot(top10, group1="MS", group2 = "Gender", value = "PDL1",  label_name = "p.format", method = "t.test")
-compareMutPlot(top10, group1="MS", group2 = "Gender", value = "PDL2",  label_name = "p.format", method = "t.test")
-compareMutPlot(top10, group1="MS", group2 = "Gender", value = "CTLA4",  label_name = "p.format", method = "t.test")
+luad_info2 %>% filter(!is.na(PD1)) %>% group_by(Gender) %>% summarise(N=n())
+
+luad_info2 %>% filter(!is.na(PD1)) %>% tidyr::gather(Genes, mValue, starts_with("PD"), CTLA4) %>% 
+    ggbarplot(x="Genes", y="mValue", add="mean_se", color="Gender", palette = "jco",
+              position = position_dodge(0.8)) + 
+    stat_compare_means(aes(group=Gender), label = "p.format") +
+    xlab("") + ylab("mRNA expression (log2)")
+
+# , label = format.pval(..p.adj.., digits = 3)
+
+
+compareBoxplot(luad_merge,
+               x = "Gender", y = "CTLA4", method = "wilcox.test")
+compareBoxplot(luad_merge,
+               x = "Gender", y = "PD1", method = "wilcox.test")
+compareBoxplot(luad_merge,
+               x = "Gender", y = "PDL1",  method = "wilcox.test")
+compareBoxplot(luad_merge,
+               x = "Gender", y = "PDL2",  method = "wilcox.test")
+
+
+
+
+# # test top 10 percent 
+# top10_male <- luad_info2 %>% filter(Gender=="Male") %>% 
+#     mutate(MS = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP, probs = 0.75) ,"Male-Top10%", "NO")) %>%
+#                filter(MS != "NO")
+# top10_female <- luad_info2 %>% filter(Gender=="Female") %>% 
+#     mutate(MS = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP, probs = 0.75) ,"Female-Top10%", "NO")) %>%
+#     filter(MS != "NO")
+# 
+# top10 <- rbind(top10_female, top10_male)
+# compareMutPlot(top10, group1="MS", group2 = "Gender", value = "PD1",  label_name = "p.format", method = "t.test")
+# compareMutPlot(top10, group1="MS", group2 = "Gender", value = "PDL1",  label_name = "p.format", method = "t.test")
+# compareMutPlot(top10, group1="MS", group2 = "Gender", value = "PDL2",  label_name = "p.format", method = "t.test")
+# compareMutPlot(top10, group1="MS", group2 = "Gender", value = "CTLA4",  label_name = "p.format", method = "t.test")
 
 
 compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "PD1",  label_name = "p.format", method = "t.test")
@@ -249,9 +274,9 @@ compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "PDL2
 compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "CTLA4", label_name = "p.format", method = "t.test")
 
 
-compareMutPlot(luad_merge, group2="TMB_Status", group1 = "Gender", value = "PD1",  label_name = "p.format", method = "t.test")
-compareMutPlot(luad_merge, group2="TMB_Status", group1 = "Gender", value = "PDL1", label_name = "p.format", method = "t.test")
-compareMutPlot(luad_merge, group2="TMB_Status", group1 = "Gender", value = "PDL2", label_name = "p.format", method = "t.test")
+# compareMutPlot(luad_merge, group2="TMB_Status", group1 = "Gender", value = "PD1",  label_name = "p.format", method = "t.test")
+# compareMutPlot(luad_merge, group2="TMB_Status", group1 = "Gender", value = "PDL1", label_name = "p.format", method = "t.test")
+# compareMutPlot(luad_merge, group2="TMB_Status", group1 = "Gender", value = "PDL2", label_name = "p.format", method = "t.test")
 
 
 
@@ -272,10 +297,76 @@ ggsave("pdl1ROC_JCO_Rizvi.pdf", plot=pdl1ROC_jco, width=5, height=4)
 MELA_Cell <- read_csv("MELA_cell.csv")
 MELA_Science <- read_csv("MELA_science.csv")
 
-plotROC(MELA_Cell, mutation_load, Response, Gender, positive = "R")
+MELA_Cell <- MELA_Cell %>% mutate(Gender=ifelse(Gender=="F", "Female", "Male"),
+                                  Response=ifelse(Response=="R", "DCB", "NDB"))
+MELA_Science <- MELA_Science %>% filter(group!="long-survival") %>% 
+    mutate(gender=ifelse(gender=="female", "Female", "Male"),
+           group=ifelse(group=="response", "DCB", "NDB"))
+    
+tmb_Mela_Cell <- compareMutPlot(MELA_Cell, group1 = "Gender", 
+                                group2 = "Response", 
+                                value = "mutation_load") + xlab("") +ylab("Tumor Mutation Burden")
+tmb_ROC_Mela_Cell <- plotROC(MELA_Cell, mutation_load, Response, Gender)
+
+tmb_Mela_Sci <- compareMutPlot(MELA_Science, group1 = "gender", group2 = "group",
+                               value = "mutation_load") + xlab("") +ylab("Tumor Mutation Burden")
+tmb_ROC_Mela_Sci <- plotROC(MELA_Science, mutation_load, group, gender)
+
+tmb_mela <- cowplot::plot_grid(tmb_Mela_Cell, tmb_Mela_Sci, nrow=1, ncol=2, align = "v")
+tmbRoc_mela <- cowplot::plot_grid(tmb_ROC_Mela_Cell, tmb_ROC_Mela_Sci, nrow=1, ncol=2, align = "v")
+
+MELA_Cell %>% group_by(Gender) %>% summarise(N=n(), Median=median(mutation_load),
+                                             Min=min(mutation_load), Max=max(mutation_load))
+MELA_Science %>% group_by(gender) %>% summarise(N=n(), Median=median(mutation_load),
+                                                Min=min(mutation_load), Max=max(mutation_load))
+ggsave("tmb_MELA.pdf", plot = tmb_mela, width = 7, height = 3)
+ggsave("tmbROC_MELA.pdf", plot = tmbRoc_mela, width = 10, height = 4)
+
+MELA_Cell %>% filter(Gender == "Male") %>% summary()
 
 
-# t <- plotROC(sampleInfo_Sci_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
+compareBoxplot(MELA_Cell,
+               x = "Gender", y = "mutation_load")
+compareBoxplot(MELA_Science,
+               x = "gender", y = "mutation_load")
+
+
+# test smoke status
+stmb_hellmann <- sampleInfo_Hellmann %>% mutate(Smoke=ifelse(Smoking_History == "never", "Never", "Current/former")) %>% 
+    filter(Smoke == "Current/former") %>% plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Gender, positive = "DCB")
+# sampleInfo_Hellmann %>% mutate(Smoke=ifelse(Smoking_History == "never", "Never", "Current/former")) %>% 
+#     filter(Smoke == "Never") %>% plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Gender, positive = "DCB")
+ggsave("stmbROC_Hellmann.pdf", plot=stmb_hellmann, width=5, height=4)
+
+
+stmb_sci_Rizvi <- sampleInfo_Sci_Rizvi %>% mutate(Smoke=ifelse(Smoking_History == "Never", "Never", "Current/former")) %>% 
+    filter(Smoke == "Current/former") %>% plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Gender, positive = "DCB")
+# sampleInfo_Sci_Rizvi %>% mutate(Smoke=ifelse(Smoking_History == "Never", "Never", "Current/former")) %>% 
+#     filter(Smoke == "Never") %>% plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Gender, positive = "DCB")
+ggsave("stmbROC_Sci_Rizvi.pdf", plot=stmb_sci_Rizvi, width=5, height=4)
+
+
+stmb_JCO_Rizvi <- sampleInfo_JCO_Rizvi %>% mutate(Smoke=ifelse(Smoking_History == "Never", "Never", "Current/former")) %>% 
+    filter(Smoke == "Current/former", Gene_Panel=="IMPACT410") %>% plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Gender, positive = "DCB")
+# sampleInfo_JCO_Rizvi %>% mutate(Smoke=ifelse(Smoking_History == "Never", "Never", "Current/former")) %>% 
+#     filter(Smoke == "Never", Gene_Panel=="IMPACT410") %>% plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Gender, positive = "DCB")
+ggsave("stmbROC_JCO_Rizvi_panel410.pdf", plot=stmb_JCO_Rizvi, width=5, height=4)
+
+sampleInfo_Hellmann %>% mutate(Smoke=ifelse(Smoking_History == "never", "Never", "Current/former")) %>% 
+     plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Smoke, positive = "DCB")
+sampleInfo_Sci_Rizvi %>% mutate(Smoke=ifelse(Smoking_History == "Never", "Never", "Current/former")) %>% 
+   plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Smoke, positive = "DCB")
+sampleInfo_JCO_Rizvi %>% mutate(Smoke=ifelse(Smoking_History == "Never", "Never", "Current/former")) %>% 
+    filter(Gene_Panel=="IMPACT410") %>% plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Smoke, positive = "DCB")
+
+p <- rbind(sampleInfo_Forde %>% select(TMB_NonsynSNP, Gender, Clinical_Benefit), 
+      sampleInfo_Hellmann %>% select(TMB_NonsynSNP, Gender, Clinical_Benefit),
+      sampleInfo_Sci_Rizvi %>%  select(TMB_NonsynSNP, Gender, Clinical_Benefit)) %>% 
+          plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit, group = Gender)
+
+ggsave("ROC_combine_NSCLC_wes_.pdf", plot=p, width=5, height=4)
+
+ # t <- plotROC(sampleInfo_Sci_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
 # 
 # plotROC(sampleInfo_Sci_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
 # plotROC(sampleInfo_Hellmann, TMB_NonsynSNP, Clinical_Benefit, Gender)

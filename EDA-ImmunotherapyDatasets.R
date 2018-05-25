@@ -81,12 +81,12 @@ ggsave(filename = "Nonsyn_Variants_asTMB_across_datasets.pdf", plot=p3, height =
 
 # JCO dataset has different gene panels
 table(sampleInfo_JCO_Rizvi$Gene_Panel)
-p4_1 <- compareMutPlot(sampleInfo_JCO_Rizvi[Clinical_Benefit %in% c("DCB", "NDB") & Gene_Panel == "IMPACT341"], value = "TMB_NonsynVariants",label_name = "p.format")
-p4_2 <- compareMutPlot(sampleInfo_JCO_Rizvi[Clinical_Benefit %in% c("DCB", "NDB") & Gene_Panel == "IMPACT410"], value = "TMB_NonsynVariants", label_name = "p.format")
-p4_3 <- compareMutPlot(sampleInfo_JCO_Rizvi[Clinical_Benefit %in% c("DCB", "NDB") & Gene_Panel == "IMPACT468"], value = "TMB_NonsynVariants", label_name = "p.format")
+p4_1 <- compareMutPlot(sampleInfo_JCO_Rizvi[Clinical_Benefit %in% c("DCB", "NDB") & Gene_Panel == "IMPACT341"], value = "TMB_NonsynSNP",label_name = "p.format")
+p4_2 <- compareMutPlot(sampleInfo_JCO_Rizvi[Clinical_Benefit %in% c("DCB", "NDB") & Gene_Panel == "IMPACT410"], value = "TMB_NonsynSNP", label_name = "p.format")
+p4_3 <- compareMutPlot(sampleInfo_JCO_Rizvi[Clinical_Benefit %in% c("DCB", "NDB") & Gene_Panel == "IMPACT468"], value = "TMB_NonsynSNP", label_name = "p.format")
 
 p4 <- grid.arrange(p4_1, p4_2, p4_3, nrow=1, ncol=3)
-ggsave(filename = "JCO_dataset_TMB_across_Gene_Panels.pdf", plot=p4, height = 3,
+ggsave(filename = "JCO_dataset_TMB_nonsynSNP_across_Gene_Panels.pdf", plot=p4, height = 3,
        width = 8)
 
 # compare different ways for TMB representation
