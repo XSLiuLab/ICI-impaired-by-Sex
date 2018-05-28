@@ -296,31 +296,43 @@ ggsave("pdl1ROC_JCO_Rizvi.pdf", plot=pdl1ROC_jco, width=5, height=4)
 ## expand to MELA datasets
 MELA_Cell <- read_csv("MELA_cell.csv")
 MELA_Science <- read_csv("MELA_science.csv")
+MELA_NEJM <- read_csv("MELA_nejm.csv")
 
 MELA_Cell <- MELA_Cell %>% mutate(Gender=ifelse(Gender=="F", "Female", "Male"),
-                                  Response=ifelse(Response=="R", "DCB", "NDB"))
+                                  Response=ifelse(Response=="R", "DCB", "NDB")) %>% 
+    rename(Clinical_Benefit=Response)
 MELA_Science <- MELA_Science %>% filter(group!="long-survival") %>% 
     mutate(gender=ifelse(gender=="female", "Female", "Male"),
-           group=ifelse(group=="response", "DCB", "NDB"))
-    
+           group=ifelse(group=="response", "DCB", "NDB")) %>% 
+    rename(Gender=gender, Clinical_Benefit=group)
+
+MELA_NEJM <- MELA_NEJM %>% rename(Gender=gender, mutation_load=Mutation_load) %>% 
+    mutate(Gender=ifelse(Gender=="F", "Female", "Male"),
+           Clinical_Benefit=ifelse(Clinical_Benefit=="LB", "DCB", "NDB"))
+
+tmb_MELA_NEJM <- compareMutPlot(MELA_NEJM, group1 = "Gender", 
+               group2 = "Clinical_Benefit", 
+               value = "mutation_load") + xlab("") +ylab("Tumor Mutation Burden")
+tmb_ROC_NEJM <- plotROC(MELA_NEJM, mutation_load, Clinical_Benefit, Gender, positive = "LB")
+
 tmb_Mela_Cell <- compareMutPlot(MELA_Cell, group1 = "Gender", 
                                 group2 = "Response", 
                                 value = "mutation_load") + xlab("") +ylab("Tumor Mutation Burden")
 tmb_ROC_Mela_Cell <- plotROC(MELA_Cell, mutation_load, Response, Gender)
 
-tmb_Mela_Sci <- compareMutPlot(MELA_Science, group1 = "gender", group2 = "group",
+tmb_Mela_Sci <- compareMutPlot(MELA_Science, group1 = "Gender", group2 = "group",
                                value = "mutation_load") + xlab("") +ylab("Tumor Mutation Burden")
-tmb_ROC_Mela_Sci <- plotROC(MELA_Science, mutation_load, group, gender)
+tmb_ROC_Mela_Sci <- plotROC(MELA_Science, mutation_load, group, Gender)
 
-tmb_mela <- cowplot::plot_grid(tmb_Mela_Cell, tmb_Mela_Sci, nrow=1, ncol=2, align = "v")
-tmbRoc_mela <- cowplot::plot_grid(tmb_ROC_Mela_Cell, tmb_ROC_Mela_Sci, nrow=1, ncol=2, align = "v")
+tmb_mela <- cowplot::plot_grid(tmb_Mela_Cell, tmb_Mela_Sci, tmb_MELA_NEJM, nrow=1, ncol=3, align = "v")
+tmbRoc_mela <- cowplot::plot_grid(tmb_ROC_Mela_Cell, tmb_ROC_Mela_Sci, tmb_ROC_NEJM, nrow=1, ncol=3, align = "v")
 
 MELA_Cell %>% group_by(Gender) %>% summarise(N=n(), Median=median(mutation_load),
                                              Min=min(mutation_load), Max=max(mutation_load))
 MELA_Science %>% group_by(gender) %>% summarise(N=n(), Median=median(mutation_load),
                                                 Min=min(mutation_load), Max=max(mutation_load))
-ggsave("tmb_MELA.pdf", plot = tmb_mela, width = 7, height = 3)
-ggsave("tmbROC_MELA.pdf", plot = tmbRoc_mela, width = 10, height = 4)
+ggsave("tmb_MELA.pdf", plot = tmb_mela, width = 10, height = 3)
+ggsave("tmbROC_MELA.pdf", plot = tmbRoc_mela, width = 14, height = 4)
 
 MELA_Cell %>% filter(Gender == "Male") %>% summary()
 
@@ -348,9 +360,10 @@ ggsave("stmbROC_Sci_Rizvi.pdf", plot=stmb_sci_Rizvi, width=5, height=4)
 
 stmb_JCO_Rizvi <- sampleInfo_JCO_Rizvi %>% mutate(Smoke=ifelse(Smoking_History == "Never", "Never", "Current/former")) %>% 
     filter(Smoke == "Current/former", Gene_Panel=="IMPACT410") %>% plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Gender, positive = "DCB")
-# sampleInfo_JCO_Rizvi %>% mutate(Smoke=ifelse(Smoking_History == "Never", "Never", "Current/former")) %>% 
-#     filter(Smoke == "Never", Gene_Panel=="IMPACT410") %>% plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Gender, positive = "DCB")
+t <- sampleInfo_JCO_Rizvi %>% mutate(Smoke=ifelse(Smoking_History == "Never", "Never", "Current/former")) %>%
+    filter(Smoke == "Never", Gene_Panel=="IMPACT410") %>% plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Gender, positive = "DCB")
 ggsave("stmbROC_JCO_Rizvi_panel410.pdf", plot=stmb_JCO_Rizvi, width=5, height=4)
+ggsave("stmbROC_JCO_Rizvi_panel410_NeverSmoker.pdf", plot=t, width=5, height=4)
 
 sampleInfo_Hellmann %>% mutate(Smoke=ifelse(Smoking_History == "never", "Never", "Current/former")) %>% 
      plotROC(predict_col = TMB_NonsynSNP, target = Clinical_Benefit,group = Smoke, positive = "DCB")

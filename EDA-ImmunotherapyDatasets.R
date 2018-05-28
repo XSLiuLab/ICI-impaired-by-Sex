@@ -42,7 +42,7 @@ sampleInfo_Sci_Rizvi <- sampleInfo_Sci_Rizvi %>% select(-TMB_Total) %>% dplyr::r
 
 sampleInfo_Sci_Rizvi <- setDT(sampleInfo_Sci_Rizvi)
 sampleInfo_Sci_Rizvi[, Gender:=ifelse(Gender=="F", "Female", "Male")]
-p1_1 <- compareMutPlot(sampleInfo_Sci_Rizvi[Clinical_Benefit %in% c("DCB", "NDB")])
+p1_1 <- compareMutPlot(subset(sampleInfo_Sci_Rizvi, Clinical_Benefit %in% c("DCB", "NDB")))
 sampleInfo_JCO_Rizvi <- setDT(sampleInfo_JCO_Rizvi)
 p1_2 <- compareMutPlot(sampleInfo_JCO_Rizvi[Clinical_Benefit %in% c("DCB", "NDB")])
 sampleInfo_Hellmann <- setDT(sampleInfo_Hellmann)
