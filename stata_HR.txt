@@ -1,0 +1,70 @@
+clear all
+
+input str6 trialname hr ll ul
+    Sci-Rizvi-M 0.298 0.089 0.999
+    Sci-Rizvi-F 0.106 0.02 0.564 
+    JCO-Rizvi-M 1.249 0.82 1.9
+    JCO-Rizvi-F 0.632 0.418 0.955
+    Hellmann-M 0.898 0.406 1.985
+    Hellmann-F 0.279 0.116 0.67
+    end
+
+metan hr ll ul, effect(Hazard Ratio) null(1) xlabel(0, .5, 1, 1.5, 2)
+
+clear all
+
+input str6 trialname hr ll ul
+    Mela-NEJM-M 0.4592 0.176 1.2
+    Mela-NEJM-F 0.688 0.249 1.9 
+    Mela-Science-M 0.84 0.476 1.479
+    Mela-Science-F 0.481 0.204 1.136
+    end
+
+metan hr ll ul, effect(Hazard Ratio) null(1) xlabel(0, .5, 1, 1.5, 2)
+
+
+# test example
+clear
+input coef lci uci str20 group str20 subpopulation
+.1266349 -.3146492 .5679189 Group1 Sub1
+-.3509529 -1.023146 .3212402 Group2 Sub1
+.08614 -.2777374 .4500174 Group1 Sub2
+-.0951817 -.358211 .1678475 Group2 Sub2
+-.0707719 -.4005753 .2590315 Group1 Sub3
+-.1216107 -.3963165 .1530952 Group2 Sub3
+.1412438 -.3248311 .6073186 Group1 Sub4
+-.260193 -.5850677 .0646817 Group2 Sub4
+-.1227866 -.5573016 .3117283 Group1 Sub5
+-.0232415 -.2844573 .2379743 Group2 Sub5
+end
+label define refsubpop 1 "Sub3" 2 "Sub1" 3 "Sub2" 4 "Sub4" 5 "Sub5"
+encode subpopulation, gen(subpop)
+label values subpop refsubpop
+codebook subpop
+metan coef lci uci, lcols(subpop) by(group)
+
+# construct examples
+
+# NSCLC
+clear
+input coef lci uci str20 subgroup str20 group
+    0.298 0.089 0.999 Rizvi-2015 Male
+    0.106 0.02 0.564 Rizvi-2015 Female
+    1.249 0.82 1.9 Rizvi-2018 Male
+    0.632 0.418 0.955 Rizvi-2018 Female
+    0.898 0.406 1.985 Hellmann-2018 Male
+    0.279 0.116 0.67 Hellmann-2018 Female
+end
+
+metan coef lci uci, effect(Hazard Ratio) lcols(subgroup) by(group) null(1) xlabel(0, .5, 1, 1.5, 2)
+
+# MELA
+clear
+input coef lci uci str20 subgroup str20 group
+    0.4592 0.176 1.2 Snyder-2014 Male
+    0.688 0.249 1.9  Snyder-2014 Female
+    0.84 0.476 1.479 Allen-2015 Male
+    0.481 0.204 1.136 Allen-2015 Female
+end
+
+metan coef lci uci, effect(Hazard Ratio) lcols(subgroup) by(group) null(1) xlabel(0, .5, 1, 1.5, 2)

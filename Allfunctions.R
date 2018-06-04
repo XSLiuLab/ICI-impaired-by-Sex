@@ -253,7 +253,7 @@ compareBoxplot <- function(df, x=NULL, y=NULL, label_name=c("p.format", "p.signi
 
 # compare mutation profile in two-level group variable
 compareMutPlot <- function(dat, group1="Gender", group2="Clinical_Benefit", 
-                           value="TMB_Total", label_name="p.signif", method = "wilcox.test"){
+                           value="TMB_Total", label_name="p.format", method = "wilcox.test"){
     require(ggpubr)
     dat <- as.data.frame(dat)
     #my_comparisons <- combn(names(table(dat[, group2])), 2, simplify = FALSE)
@@ -261,9 +261,10 @@ compareMutPlot <- function(dat, group1="Gender", group2="Clinical_Benefit",
     name_sort <- names(table(dat[, group1]))
     dat[, group1] <- factor(dat[, group1], levels = name_sort)
     p <- ggboxplot(dat, x = group1, y = value,
-                   color = group2, palette = "jco",
+                   color = group2, palette = c("red", "blue"),
                    add = "jitter", shape = group2, font.label = list(size=6), 
-                   ggtheme = theme_pubr(base_size = 8)) + theme(plot.title = element_text(hjust = 0.5))
+                   add.params = list(size=2), 
+                   ggtheme = theme_pubr()) + theme(plot.title = element_text(hjust = 0.5))
     
     p + stat_compare_means(aes_string(group=group2), label = label_name, 
                            method = method)        # Add pairwise comparisons p-value

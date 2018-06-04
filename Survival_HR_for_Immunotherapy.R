@@ -375,7 +375,7 @@ fit10_2 <- survfit(Surv(OS, Event) ~ TMB_Status,
 ggsurvplot(fit10_1, risk.table = TRUE, pval = TRUE)
 ggsurvplot(fit10_2, risk.table = TRUE, pval = TRUE)
 
-mela_science <- buildCModel2(MELA_Science, OS, Event, Gender, TMB)
+mela_science <- buildCModel3(MELA_Science, OS, Event, Gender, TMB)
 fit10_3 <- survfit(Surv(OS, Event) ~ TMB_Status,
                    data = mela_science$male)
 fit10_4 <- survfit(Surv(OS, Event) ~ TMB_Status,
@@ -383,7 +383,7 @@ fit10_4 <- survfit(Surv(OS, Event) ~ TMB_Status,
 ggsurvplot(fit10_3, risk.table = TRUE, pval = TRUE)
 ggsurvplot(fit10_4, risk.table = TRUE, pval = TRUE)
 
-mela_cell <- buildCModel2(MELA_Cell, OS, Event, Gender, TMB)
+mela_cell <- buildCModel3(MELA_Cell, OS, Event, Gender, TMB)
 fit10_11 <- survfit(Surv(OS, Event) ~ TMB_Status,
                    data = mela_cell$male)
 fit10_12 <- survfit(Surv(OS, Event) ~ TMB_Status,
@@ -391,7 +391,7 @@ fit10_12 <- survfit(Surv(OS, Event) ~ TMB_Status,
 ggsurvplot(fit10_11, risk.table = TRUE, pval = TRUE)
 ggsurvplot(fit10_12, risk.table = TRUE, pval = TRUE)
 
-nsclc_hellmann <-  buildCModel2(sampleInfo_Hellmann, PFS_Months, PFS_Event, Gender, TMB_NonsynSNP)
+nsclc_hellmann <-  buildCModel3(sampleInfo_Hellmann, PFS_Months, PFS_Event, Gender, TMB_NonsynSNP)
 fit10_5 <- survfit(Surv(PFS_Months, PFS_Event) ~ TMB_Status,
                 data = nsclc_hellmann$male)
 fit10_6 <- survfit(Surv(PFS_Months, PFS_Event) ~ TMB_Status,
@@ -399,7 +399,7 @@ fit10_6 <- survfit(Surv(PFS_Months, PFS_Event) ~ TMB_Status,
 ggsurvplot(fit10_5, risk.table = TRUE,  pval = TRUE)
 ggsurvplot(fit10_6, risk.table = TRUE, pval = TRUE)
 
-nsclc_sci_Rizvi <-  buildCModel2(sampleInfo_Sci_Rizvi, PFS_Months, PFS_Event, Gender, TMB_NonsynSNP)
+nsclc_sci_Rizvi <-  buildCModel3(sampleInfo_Sci_Rizvi, PFS_Months, PFS_Event, Gender, TMB_NonsynSNP)
 fit10_7 <- survfit(Surv(PFS_Months, PFS_Event) ~ TMB_Status,
                    data = nsclc_sci_Rizvi$male)
 fit10_8 <- survfit(Surv(PFS_Months, PFS_Event) ~ TMB_Status,

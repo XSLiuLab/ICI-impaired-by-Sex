@@ -80,3 +80,7 @@ ggsave("summaryFigures/ROC-NSCLC吸烟-CancerCell-Hellmann.tiff", plot = p6_1, w
 ggsave("summaryFigures/ROC-NSCLC吸烟-Science_Rizvi.tiff", plot = p6_2, width = 5, height = 4, dpi=300)
 ggsave("summaryFigures/ROC-NSCLC吸烟-JCO-Rizvi-410Gene.tiff", plot = p6_3, width = 5, height = 4, dpi=300)
 ggsave("summaryFigures/ROC-NSCLC从不吸烟-JCO-Rizvi-410Gene.tiff", plot = p6_4, width = 5, height = 4, dpi=300)
+
+
+# summary data from Survival_HR_for... R
+

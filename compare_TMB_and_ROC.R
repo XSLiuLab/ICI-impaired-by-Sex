@@ -115,7 +115,8 @@ plotROC <- function(.data, predict_col, target, group, positive="DCB", all=TRUE)
         p <- p + annotate("text", x = .75, y = .25, 
                           label = paste(names(auc)[1], " AUC =", round(auc[1], 3), "\n",
                                         names(auc)[2], " AUC =", round(auc[2], 3), "\n",
-                                        names(auc)[3], " AUC =", round(auc[3], 3), "\n"))
+                                        names(auc)[3], " AUC =", round(auc[3], 3), "\n"),
+                          size = 2)
     }
     
     p + xlab("1 - Specificity") + ylab("Sensitivity") + 
@@ -186,16 +187,43 @@ rm(luad_maf); gc()
 # load gene levels
 load("C:/Users/wangshx/Desktop/data/summary_of_genes.RData")
 selt_genes <- GeneSummary$Expr[GeneSymbol %in% c("PDCD1", "CD274", "PDCD1LG2", "CTLA4")]
-
+selt_pros <- GeneSummary$Protein[GeneSymbol %in% c("PDCD1-M-E", "PD-L1-R-V")]
 selt_genes <- selt_genes %>% 
     gather(Tumor_Sample_Barcode, mvalue, starts_with("TCGA")) %>% spread(GeneSymbol, mvalue) %>% 
     rename(PD1 = PDCD1, PDL1 = CD274, PDL2 = PDCD1LG2)
+
+selt_pros <-  selt_pros %>% 
+    gather(Tumor_Sample_Barcode, mvalue, starts_with("TCGA")) %>% spread(GeneSymbol, mvalue) %>% 
+    rename(PD1_pro = `PDCD1-M-E`, PDL1_pro = `PD-L1-R-V`)
 
 # 
 # LUAD_TMB3 <- LUAD_TMB2
 LUAD_TMB3$Tumor_Sample_Barcode <- paste0(LUAD_TMB3$Tumor_Sample_Barcode, "-01")
 
 luad_merge <- dplyr::left_join(LUAD_TMB3, selt_genes, by="Tumor_Sample_Barcode")
+luad_merge2 <- dplyr::left_join(luad_merge, selt_pros, by="Tumor_Sample_Barcode")
+
+
+compareBoxplot(luad_merge,
+               x = "Gender", y = "CTLA4", method = "wilcox.test")
+compareBoxplot(luad_merge,
+               x = "Gender", y = "PD1", method = "wilcox.test")
+compareBoxplot(luad_merge,
+               x = "Gender", y = "PDL1",  method = "wilcox.test")
+compareBoxplot(luad_merge,
+               x = "Gender", y = "PDL2",  method = "wilcox.test")
+
+
+compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "PD1",  label_name = "p.format", method = "t.test")
+compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "PDL1", label_name = "p.format", method = "t.test")
+compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "PDL2", label_name = "p.format", method = "t.test")
+compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "CTLA4", label_name = "p.format", method = "t.test")
+
+compareMutPlot(luad_merge2, group1="TMB_Status", group2 = "Gender", value = "PDL1_pro", label_name = "p.format", method = "t.test")
+
+compareMutPlot(luad_merge, group2 ="TMB_Status", group1 = "Gender", value = "PDL1", label_name = "p.format", method = "t.test")
+compareMutPlot(luad_merge2, group2 ="TMB_Status", group1 = "Gender", value = "PDL1_pro", label_name = "p.format", method = "t.test")
+#######
 luad_info <- LUAD_TMB2 %>% 
     mutate(Tumor_Sample_Barcode = paste0(Tumor_Sample_Barcode, "-01") )%>%
     dplyr::left_join(y= selt_genes, by="Tumor_Sample_Barcode")
@@ -241,14 +269,7 @@ luad_info2 %>% filter(!is.na(PD1)) %>% tidyr::gather(Genes, mValue, starts_with(
 # , label = format.pval(..p.adj.., digits = 3)
 
 
-compareBoxplot(luad_merge,
-               x = "Gender", y = "CTLA4", method = "wilcox.test")
-compareBoxplot(luad_merge,
-               x = "Gender", y = "PD1", method = "wilcox.test")
-compareBoxplot(luad_merge,
-               x = "Gender", y = "PDL1",  method = "wilcox.test")
-compareBoxplot(luad_merge,
-               x = "Gender", y = "PDL2",  method = "wilcox.test")
+
 
 
 
@@ -268,10 +289,7 @@ compareBoxplot(luad_merge,
 # compareMutPlot(top10, group1="MS", group2 = "Gender", value = "CTLA4",  label_name = "p.format", method = "t.test")
 
 
-compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "PD1",  label_name = "p.format", method = "t.test")
-compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "PDL1", label_name = "p.format", method = "t.test")
-compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "PDL2", label_name = "p.format", method = "t.test")
-compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "CTLA4", label_name = "p.format", method = "t.test")
+
 
 
 # compareMutPlot(luad_merge, group2="TMB_Status", group1 = "Gender", value = "PD1",  label_name = "p.format", method = "t.test")
@@ -379,7 +397,26 @@ p <- rbind(sampleInfo_Forde %>% select(TMB_NonsynSNP, Gender, Clinical_Benefit),
 
 ggsave("ROC_combine_NSCLC_wes_.pdf", plot=p, width=5, height=4)
 
- # t <- plotROC(sampleInfo_Sci_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
+
+
+all_f <- c(0.912, 0.715, 0.722, 0.67, 0.267, 0.817, 0.743)
+all_m <- c(0.633, 0.629, 0.391, 0.565, 0.759, 0.604, 0.772)
+
+t.test(all_f, all_m)
+wilcox.test(all_f, all_m)
+
+nsclc_f <- c(0.912, 0.715, 0.722, 0.67)
+nsclc_m <- c(0.633, 0.629, 0.391, 0.565)
+t.test(nsclc_f, nsclc_m, paired = TRUE) 
+wilcox.test(nsclc_f, nsclc_m, paired=TRUE)
+
+# remove cell paper
+all_f2 <- c(0.912, 0.715, 0.722, 0.67, 0.817, 0.743)
+all_m2 <- c(0.633, 0.629, 0.391, 0.565, 0.604, 0.772)
+t.test(all_f2, all_m2, paired = TRUE)
+wilcox.test(all_f2, all_m2, paired = TRUE)
+
+# t <- plotROC(sampleInfo_Sci_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
 # 
 # plotROC(sampleInfo_Sci_Rizvi, TMB_NonsynSNP, Clinical_Benefit, Gender)
 # plotROC(sampleInfo_Hellmann, TMB_NonsynSNP, Clinical_Benefit, Gender)
