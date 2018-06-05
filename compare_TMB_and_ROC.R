@@ -171,9 +171,15 @@ LUAD_clin <- luad_maf@clinical.data %>% select(Tumor_Sample_Barcode, gender) %>%
 LUAD_TMB2 <-  dplyr::full_join(LUAD_TMB, LUAD_clin, by="Tumor_Sample_Barcode") %>% 
     filter(Gender %in% c("Male", "Female"))
 
-LUAD_TMB3 <- LUAD_TMB2 %>% mutate(TMB_Status = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP)[4],
-                                         "High", ifelse(TMB_NonsynSNP <= quantile(TMB_NonsynSNP)[2],
-                                                      "Low", "Mid"))) %>% filter(TMB_Status != "Mid")
+# LUAD_TMB3 <- LUAD_TMB2 %>% mutate(TMB_Status = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP)[4],
+#                                          "High", ifelse(TMB_NonsynSNP <= quantile(TMB_NonsynSNP)[2],
+#                                                       "Low", "Mid"))) %>% filter(TMB_Status != "Mid")
+
+# use 5 as a cutoff
+
+LUAD_TMB3 <- LUAD_TMB2 %>% mutate(TMB = TMB_NonsynSNP / 30 ) %>% 
+    mutate(TMB_Status = ifelse(TMB > 4, "High", "Low"))
+
 
 
 # LUAD_TMB3 <- LUAD_TMB2 %>% mutate(TMB_Status = ifelse(TMB_NonsynSNP >= quantile(TMB_NonsynSNP, 0.75),
@@ -202,6 +208,8 @@ LUAD_TMB3$Tumor_Sample_Barcode <- paste0(LUAD_TMB3$Tumor_Sample_Barcode, "-01")
 
 luad_merge <- dplyr::left_join(LUAD_TMB3, selt_genes, by="Tumor_Sample_Barcode")
 luad_merge2 <- dplyr::left_join(luad_merge, selt_pros, by="Tumor_Sample_Barcode")
+
+luad_merge2 %>% group_by(Gender, TMB_Status) %>% summarize(N_expr=n(), N_pro=length(which(!is.na(PDL1_pro))))
 
 
 compareBoxplot(luad_merge,
