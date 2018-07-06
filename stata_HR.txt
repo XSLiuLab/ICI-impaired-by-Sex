@@ -9,7 +9,7 @@ input str6 trialname hr ll ul
     Hellmann-F 0.279 0.116 0.67
     end
 
-metan hr ll ul, effect(Hazard Ratio) null(1) xlabel(0, .5, 1, 1.5, 2)
+metan hr ll ul, effect(Hazard Ratio) null(1) xlabel(0, .5, 1, 1.5, 2) favours(Favours TMB-H # Favours TMB-L)
 
 clear all
 
@@ -43,7 +43,8 @@ label values subpop refsubpop
 codebook subpop
 metan coef lci uci, lcols(subpop) by(group)
 
-# construct examples
+# construct examples: Deluded approach (ref: Meta-analytical methods to identify who benefits most from treatments: daft, delued, or deft approach)
+
 
 # NSCLC
 clear
@@ -68,3 +69,20 @@ input coef lci uci str20 subgroup str20 group
 end
 
 metan coef lci uci, effect(Hazard Ratio) lcols(subgroup) by(group) null(1) xlabel(0, .5, 1, 1.5, 2)
+
+
+# construct examples: Deft approach 
+# new data calculated by R metafor
+
+# NSCLC
+
+clear all
+
+input hr ll ul str20 Dataset
+	0.356 0.0453 2.79 Rizvi-2015 
+	0.506 0.281  0.912 Rizvi-2018 
+	0.311 0.116  0.830 Hellmann-2018 
+    end
+
+metan hr ll ul, effect(Mean Difference) lcols(Dataset) null(1) xlabel(0, .5, 1, 1.5, 2) favours(Favours greater effect of TMB-H in female # Favours greater effect of TMB-H in male)
+

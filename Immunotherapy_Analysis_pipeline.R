@@ -231,6 +231,10 @@ ggplot(cs_mela_science, aes(x=cutoff, y=HR, color=Gender)) + geom_point() + geom
 # NSCLC
 nsclc <- nsclc %>% mutate(Cutoff = factor(ifelse(sTMB > 4, "High", "Low"),
                                           levels = c("Low", "High") ))
+nsclc$dataset = c(rep("Hellmann 2018", nrow(sampleInfo_Hellmann)),
+                  rep("Rizvi 2018", nrow(sampleInfo_JCO_Rizvi)),
+                  rep("Rizvi 2015", nrow(sampleInfo_Sci_Rizvi)))
+
 summary(coxph(Surv(PFS_Months, PFS_Event) ~ Cutoff,
               data = subset(nsclc, Gender=="Male")))
 summary(coxph(Surv(PFS_Months, PFS_Event) ~ Cutoff,
@@ -477,3 +481,132 @@ ggsave("Figures/CompareROC-NSCLC-ALL.pdf", plot = p5_1, width = 4, height = 3)
 # 
 # compareMutPlot(MELA_NEJM, group1 = "Gender", group2 = "Clinical_Benefit",
 #                value = "sTMB") + xlab("") +ylab("Tumor Mutation Burden") 
+
+
+### Oncoplot for Maf data
+impGenes =  c("TP53", "KRAS", "STK11", "EGFR", "ALK", "BRAF", "RET", "ROS1", "PETEN", "POLE")
+
+oncoplot(Science_Rizvi_maf, fontSize = 12)
+Science_Rizvi_maf_F = subsetMaf(Science_Rizvi_maf, tsb=subset(Science_Rizvi_maf@clinical.data, 
+                                                              Gender=="F")$Tumor_Sample_Barcode,
+                                mafObj = TRUE)
+oncoplot(Science_Rizvi_maf_F, fontSize = 12)
+Science_Rizvi_maf_M = subsetMaf(Science_Rizvi_maf, tsb=subset(Science_Rizvi_maf@clinical.data, 
+                                                              Gender=="M")$Tumor_Sample_Barcode,
+                                mafObj = TRUE)
+oncoplot(Science_Rizvi_maf_M, fontSize = 12, top = 50)
+
+coOncoplot(m1 = Science_Rizvi_maf_M, m2 = Science_Rizvi_maf_F, m1Name = "Rizvi et al (2015) - Male",
+           m2Name = "Rizvi et al (2015) - Female", genes = impGenes)
+
+JCO_Rizvi_maf_F = subsetMaf(JCO_Rizvi_maf, tsb=subset(JCO_Rizvi_maf@clinical.data, 
+                                                              Gender=="Female")$Tumor_Sample_Barcode,
+                                mafObj = TRUE)
+JCO_Rizvi_maf_M = subsetMaf(JCO_Rizvi_maf, tsb=subset(JCO_Rizvi_maf@clinical.data, 
+                                                      Gender=="Male")$Tumor_Sample_Barcode,
+                            mafObj = TRUE)
+coOncoplot(m1 = JCO_Rizvi_maf_M, m2 = JCO_Rizvi_maf_F, m1Name = "Rizvi et al (2018) - Male",
+           m2Name = "Rizvi et al (2018) - Female", genes = impGenes)
+
+Hellmann_maf_F = subsetMaf(Hellmann_maf, tsb=subset(Hellmann_maf@clinical.data, 
+                                                     Gender=="female")$Tumor_Sample_Barcode,
+                           mafObj = TRUE)
+Hellmann_maf_M = subsetMaf(Hellmann_maf, tsb=subset(Hellmann_maf@clinical.data, 
+                                                    Gender=="male")$Tumor_Sample_Barcode,
+                           mafObj = TRUE)
+coOncoplot(m1 = Hellmann_maf_M, m2 = Hellmann_maf_F, m1Name = "Hellmann et al (2018) - Male",
+           m2Name = "Hellmann et al (2018) - Female", genes = impGenes)
+
+
+### Compare ROC considering Gene Mutation
+my_palette <- c("black", "red", "blue")
+add_modify <- theme(axis.line = element_line(colour = 'black', size = 1.0),
+                    axis.ticks = element_line(colour = "black", size = 1.0))
+#axis.text.y = element_blank(), 
+#axis.text.x = element_blank()) 
+
+sample_jcoRizvi = as.character(JCO_Rizvi_maf@clinical.data$Tumor_Sample_Barcode)
+
+####### Jco Rizvi 
+## TP53
+sample_jcoRizvi_TP53_plus = JCO_Rizvi_maf@data %>% filter(Hugo_Symbol == "TP53") %>% select(Tumor_Sample_Barcode) %>% unlist %>% as.character() %>% unique()
+sample_jcoRizvi_TP53_minus = setdiff(sample_jcoRizvi, sample_jcoRizvi_TP53_plus)
+
+m_1 = plotROC(sampleInfo_JCO_Rizvi %>% filter(Tumor_Sample_Barcode %in% sample_jcoRizvi_TP53_minus),
+        sTMB, Clinical_Benefit, Gender) + 
+    scale_color_manual(values = my_palette) + add_modify
+
+m_2 = plotROC(sampleInfo_JCO_Rizvi %>% filter(Tumor_Sample_Barcode %in% sample_jcoRizvi_TP53_plus),
+        sTMB, Clinical_Benefit, Gender) + 
+    scale_color_manual(values = my_palette) + add_modify
+
+ggsave("Figures/CompareROC-Mutation-JCO-Rizvi-TP53minus.pdf", plot = m_1, width = 4, height = 3)
+ggsave("Figures/CompareROC-Mutation-JCO-Rizvi-TP53plus.pdf", plot = m_2, width = 4, height = 3)
+## KRAS
+sample_jcoRizvi_KRAS_plus = JCO_Rizvi_maf@data %>% filter(Hugo_Symbol == "KRAS") %>% select(Tumor_Sample_Barcode) %>% unlist %>% as.character() %>% unique()
+sample_jcoRizvi_KRAS_minus = setdiff(sample_jcoRizvi, sample_jcoRizvi_KRAS_plus)
+
+m_3 = plotROC(sampleInfo_JCO_Rizvi %>% filter(Tumor_Sample_Barcode %in% sample_jcoRizvi_KRAS_minus),
+        sTMB, Clinical_Benefit, Gender) + 
+    scale_color_manual(values = my_palette) + add_modify
+
+m_4 = plotROC(sampleInfo_JCO_Rizvi %>% filter(Tumor_Sample_Barcode %in% sample_jcoRizvi_KRAS_plus),
+        sTMB, Clinical_Benefit, Gender) + 
+    scale_color_manual(values = my_palette) + add_modify
+
+ggsave("Figures/CompareROC-Mutation-JCO-Rizvi-KRAS_minus.pdf", plot = m_3, width = 4, height = 3)
+ggsave("Figures/CompareROC-Mutation-JCO-Rizvi-KRASplus.pdf", plot = m_4, width = 4, height = 3)
+## EGFR/ALK
+sample_jcoRizvi_EGFR_plus = JCO_Rizvi_maf@data %>% filter(Hugo_Symbol == "EGFR") %>% select(Tumor_Sample_Barcode) %>% unlist %>% as.character() %>% unique()
+sample_jcoRizvi_ALK_plus = JCO_Rizvi_maf@data %>% filter(Hugo_Symbol == "ALK") %>% select(Tumor_Sample_Barcode) %>% unlist %>% as.character() %>% unique()
+
+sample_jcoRizvi_EGFR_ALK_minus = setdiff(sample_jcoRizvi, union(sample_jcoRizvi_EGFR_plus, sample_jcoRizvi_ALK_plus))
+
+m_5 = plotROC(sampleInfo_JCO_Rizvi %>% filter(Tumor_Sample_Barcode %in% sample_jcoRizvi_EGFR_ALK_minus),
+        sTMB, Clinical_Benefit, Gender) + 
+    scale_color_manual(values = my_palette) + add_modify
+ggsave("Figures/CompareROC-Mutation-JCO-Rizvi-EGFR_ALK_minus.pdf", plot = m_5, width = 4, height = 3)
+
+
+sample_Hellmann = as.character(Hellmann_maf@clinical.data$Tumor_Sample_Barcode)
+#######  Hellmann
+## TP53
+sample_Hellmann_TP53_plus = Hellmann_maf@data %>% filter(Hugo_Symbol == "TP53") %>% select(Tumor_Sample_Barcode) %>% unlist %>% as.character() %>% unique()
+sample_Hellmann_TP53_minus = setdiff(sample_Hellmann, sample_Hellmann_TP53_plus)
+# sample_hellmann_TP53_minus = sample_hellmann[! sample_hellmann %in% sample_hellmann_TP53_plus]
+
+
+m_6 = plotROC(sampleInfo_Hellmann %>% filter(Tumor_Sample_Barcode %in% sample_Hellmann_TP53_minus),
+        sTMB, Clinical_Benefit, Gender) + 
+    scale_color_manual(values = my_palette) + add_modify
+
+m_7 = plotROC(sampleInfo_Hellmann %>% filter(Tumor_Sample_Barcode %in% sample_Hellmann_TP53_plus),
+        sTMB, Clinical_Benefit, Gender) + 
+    scale_color_manual(values = my_palette) + add_modify
+
+ggsave("Figures/CompareROC-Mutation-Hellmann-TP53minus.pdf", plot = m_6, width = 4, height = 3)
+ggsave("Figures/CompareROC-Mutation-Hellmann-TP53plus.pdf", plot = m_7, width = 4, height = 3)
+## KRAS
+sample_Hellmann_KRAS_plus = Hellmann_maf@data %>% filter(Hugo_Symbol == "KRAS") %>% select(Tumor_Sample_Barcode) %>% unlist %>% as.character() %>% unique()
+sample_Hellmann_KRAS_minus = setdiff(sample_Hellmann, sample_Hellmann_KRAS_plus)
+
+m_8 = plotROC(sampleInfo_Hellmann %>% filter(Tumor_Sample_Barcode %in% sample_Hellmann_KRAS_minus),
+        sTMB, Clinical_Benefit, Gender) + 
+    scale_color_manual(values = my_palette) + add_modify
+
+m_9 = plotROC(sampleInfo_Hellmann %>% filter(Tumor_Sample_Barcode %in% sample_Hellmann_KRAS_plus),
+        sTMB, Clinical_Benefit, Gender) + 
+    scale_color_manual(values = my_palette) + add_modify
+
+ggsave("Figures/CompareROC-Mutation-Hellmann-KRAS_minus.pdf", plot = m_8, width = 4, height = 3)
+ggsave("Figures/CompareROC-Mutation-Hellmann-KRASplus.pdf", plot = m_9, width = 4, height = 3)
+## EGFR/ALK
+sample_Hellmann_EGFR_plus = Hellmann_maf@data %>% filter(Hugo_Symbol == "EGFR") %>% select(Tumor_Sample_Barcode) %>% unlist %>% as.character() %>% unique()
+sample_Hellmann_ALK_plus = Hellmann_maf@data %>% filter(Hugo_Symbol == "ALK") %>% select(Tumor_Sample_Barcode) %>% unlist %>% as.character() %>% unique()
+
+sample_Hellmann_EGFR_ALK_minus = setdiff(sample_Hellmann, union(sample_Hellmann_EGFR_plus, sample_Hellmann_ALK_plus))
+
+m_10 = plotROC(sampleInfo_Hellmann %>% filter(Tumor_Sample_Barcode %in% sample_Hellmann_EGFR_ALK_minus),
+        sTMB, Clinical_Benefit, Gender) + 
+    scale_color_manual(values = my_palette) + add_modify
+ggsave("Figures/CompareROC-Mutation-Hellmann-EGFR_ALK_minus.pdf", plot = m_10, width = 4, height = 3)

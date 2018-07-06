@@ -192,8 +192,19 @@ LUAD_TMB3 %>% group_by(Gender) %>%
 rm(luad_maf); gc()
 # load gene levels
 load("C:/Users/wangshx/Desktop/data/summary_of_genes.RData")
-selt_genes <- GeneSummary$Expr[GeneSymbol %in% c("PDCD1", "CD274", "PDCD1LG2", "CTLA4")]
-selt_pros <- GeneSummary$Protein[GeneSymbol %in% c("PDCD1-M-E", "PD-L1-R-V")]
+geneList = c("AQP11", "ARSD", "BCORL2", "COL9A1", "CST5", "CYorf15A",
+             "CYorf15B", "DDX3Y", "EIF1AX", "EIF1AY", "EIF2S3", "FAM150A",
+             "FUNDC1", "GEMIN8", "HDHD1A", "KAL1", "KDM5D", "KDM6A",
+             "NCRNA00183", "NCRNA00185", "NCRNA00230B", "NLGN4Y",
+             "PART1", "PCDH11Y", "PNPLA4", "PRKY", "RPS4X", "RPS4Y1", "SOX11",
+             "SRY", "STS", "TBL1Y", "TMSB4Y", "TRAPPC2", "TSIX", "TTTY14",
+             "TTTY15", "USP9Y", "UTY", "XIST", "ZFX", "ZFY", "ZNF826", "ZRSR2")
+selt_genes <- GeneSummary$Expr[GeneSymbol %in% geneList]
+selt_genes <- selt_genes %>% 
+    gather(Tumor_Sample_Barcode, mvalue, starts_with("TCGA")) %>% spread(GeneSymbol, mvalue)
+
+# selt_genes <- GeneSummary$Expr[GeneSymbol %in% c("PDCD1", "CD274", "PDCD1LG2", "CTLA4")]
+# selt_pros <- GeneSummary$Protein[GeneSymbol %in% c("PDCD1-M-E", "PD-L1-R-V")]
 selt_genes <- selt_genes %>% 
     gather(Tumor_Sample_Barcode, mvalue, starts_with("TCGA")) %>% spread(GeneSymbol, mvalue) %>% 
     rename(PD1 = PDCD1, PDL1 = CD274, PDL2 = PDCD1LG2)
@@ -211,6 +222,89 @@ luad_merge2 <- dplyr::left_join(luad_merge, selt_pros, by="Tumor_Sample_Barcode"
 
 luad_merge2 %>% group_by(Gender, TMB_Status) %>% summarize(N_expr=n(), N_pro=length(which(!is.na(PDL1_pro))))
 
+# genelist plot
+df = luad_merge %>% tidyr::gather(key = Genes, expression, AQP11:ZRSR2)
+
+
+ggplot(df, aes(Tumor_Sample_Barcode, Genes, group=Gender)) + 
+    geom_tile(aes(fill = expression),colour = "white") + 
+    scale_fill_gradient(low = "blue",high = "red") + scale_x_discrete(breaks=NULL)
+
+annotation = df %>% select(Tumor_Sample_Barcode, TMB_Status, Gender) %>% unique.data.frame()
+rownames(annotation) = annotation$Tumor_Sample_Barcode
+annotation = annotation[, -1]
+annotation = annotation %>% rownames_to_column(var="id") %>% 
+    arrange(Gender, TMB_Status) %>% 
+    column_to_rownames(var="id")
+annotation = annotation %>% select(Gender, TMB_Status)
+
+df = luad_merge[, -1:-7]
+rownames(df) = luad_merge$Tumor_Sample_Barcode
+df = t(df)
+df = df[, rownames(annotation)]
+
+
+pheatmap::pheatmap(df,cluster_cols=FALSE,cluster_rows=TRUE,legend=TRUE,
+                   color=colorRampPalette(c("green","black","red"))(1000),
+                   border_color=FALSE,fontsize=10,fontsize_row=12,fontsize_col=12,
+                   annotation=annotation,annotation_legend=TRUE, show_colnames = FALSE)
+
+compareSignature = function(geneList){
+    selt_genes <- GeneSummary$Expr[GeneSymbol %in% geneList] %>% 
+        gather(Tumor_Sample_Barcode, mvalue, starts_with("TCGA")) %>% spread(GeneSymbol, mvalue)
+    
+    # LUAD_TMB3$Tumor_Sample_Barcode <- paste0(LUAD_TMB3$Tumor_Sample_Barcode, "-01")
+    geneNames = colnames(selt_genes)[-1]
+    
+    luad_merge <- dplyr::left_join(LUAD_TMB3, selt_genes, by="Tumor_Sample_Barcode")
+    # df = luad_merge %>% tidyr::gather(key = Genes, expression, AQP11:ZRSR2)
+    df = luad_merge %>% tidyr::gather_("Genes", "expression", geneNames)
+    annotation = df %>% select(Tumor_Sample_Barcode, TMB_Status, Gender) %>% unique.data.frame()
+    rownames(annotation) = annotation$Tumor_Sample_Barcode
+    annotation = annotation[, -1]
+    annotation = annotation %>% rownames_to_column(var="id") %>% 
+        arrange(Gender, TMB_Status) %>% 
+        column_to_rownames(var="id")
+    annotation = annotation %>% select(Gender, TMB_Status)
+    
+    df = luad_merge[, -1:-7]
+    rownames(df) = luad_merge$Tumor_Sample_Barcode
+    df = t(df)
+    df = df[, rownames(annotation)]
+    
+    
+    pheatmap::pheatmap(df,cluster_cols=FALSE,cluster_rows=TRUE,legend=TRUE,
+                       color=colorRampPalette(c("green","black","red"))(1000),
+                       border_color=FALSE,fontsize=10,fontsize_row=12,fontsize_col=12,
+                       annotation=annotation,annotation_legend=TRUE, show_colnames = FALSE)
+}
+
+geneList = read_csv("G:/biodata/datasets/Science_Davoli/Immune_Marker_GeneList.csv")
+compareSignature(geneList %>% filter(Cell_Type=="CD4.mature") %>% select(Gene_Name) %>% unlist)
+compareSignature(geneList %>% filter(Cell_Type=="CD8.effector") %>% select(Gene_Name) %>% unlist)
+compareSignature(geneList %>% filter(Cell_Type=="NK.cells") %>% select(Gene_Name) %>% unlist)
+compareSignature(geneList %>% filter(Cell_Type=="B.cells") %>% select(Gene_Name) %>% unlist)
+compareSignature(geneList %>% filter(Cell_Type=="T.reg") %>% select(Gene_Name) %>% unlist)
+compareSignature(geneList %>% filter(Cell_Type=="Dendritic") %>% select(Gene_Name) %>% unlist)
+compareSignature(geneList %>% filter(Cell_Type=="T.reg") %>% select(Gene_Name) %>% unlist)
+compareSignature(geneList %>% filter(Cell_Type=="CD8.effector.NK.cells") %>% select(Gene_Name) %>% unlist)
+compareSignature(geneList %>% filter(Cell_Type=="Macrophages") %>% select(Gene_Name) %>% unlist)
+compareSignature(geneList %>% filter(Cell_Type=="Macrophages.M2") %>% select(Gene_Name) %>% unlist)
+compareSignature(geneList %>% filter(Cell_Type=="Macrophages.M1") %>% select(Gene_Name) %>% unlist)
+
+load("C:/Users/wangshx/Desktop/data/TCGA_LUAD_TIL.RData")
+compareTIL = function(TIL_df){
+    TIL_df = TIL$timer 
+    TIL_df = TIL$quanTIseq
+    TIL_df = left_join(LUAD_TMB3, TIL_df, by="Tumor_Sample_Barcode")
+    compareMutPlot(TIL_df, group1="Gender", group2 = "TMB_Status", value = "B_cell",  label_name = "p.format", method = "wilcox.test")
+    compareMutPlot(TIL_df, group1="Gender", group2 = "TMB_Status", value = "T_cell.CD8",  label_name = "p.format", method = "wilcox.test")
+    compareMutPlot(TIL_df, group1="Gender", group2 = "TMB_Status", value = "T_cell.CD4",  label_name = "p.format", method = "wilcox.test")
+    compareMutPlot(TIL_df, group1="Gender", group2 = "TMB_Status", value = "Neutrophil",  label_name = "p.format", method = "wilcox.test")
+    compareMutPlot(TIL_df, group1="Gender", group2 = "TMB_Status", value = "Macrophage",  label_name = "p.format", method = "wilcox.test")
+    compareMutPlot(TIL_df, group1="Gender", group2 = "TMB_Status", value = "DC",  label_name = "p.format", method = "wilcox.test")
+}
+
 
 compareBoxplot(luad_merge,
                x = "Gender", y = "CTLA4", method = "wilcox.test")
@@ -220,6 +314,7 @@ compareBoxplot(luad_merge,
                x = "Gender", y = "PDL1",  method = "wilcox.test")
 compareBoxplot(luad_merge,
                x = "Gender", y = "PDL2",  method = "wilcox.test")
+
 
 
 compareMutPlot(luad_merge, group1="TMB_Status", group2 = "Gender", value = "PD1",  label_name = "p.format", method = "t.test")

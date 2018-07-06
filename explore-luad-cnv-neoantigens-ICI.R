@@ -174,12 +174,25 @@ luad <- luad %>% mutate(Dataset = case_when(
 #save
 save(luad, file="Rdata/ICI_luad_merge.RData")
 
+luad_jcoRizvi_apobec_C_T = subsetMaf(luad_jcoRizvi, tsb = subset(luad_jcoRizvi_info, 
+                                                              Aetiology=="APOBEC-C>T")$Tumor_Sample_Barcode, mafObj = TRUE)
+luad_jcoRizvi_smoking = subsetMaf(luad_jcoRizvi, tsb = subset(luad_jcoRizvi_info, 
+                                                              Aetiology=="Smoking")$Tumor_Sample_Barcode, mafObj = TRUE)
+luad_jcoRizvi_apobec_C_G = subsetMaf(luad_jcoRizvi, tsb = subset(luad_jcoRizvi_info, 
+                                                                 Aetiology=="APOBEC-C>G")$Tumor_Sample_Barcode, mafObj = TRUE)
 
+compare_JCO_apobecC2T_Smoking = mafCompare(m1=luad_jcoRizvi_apobec_C_T, m2=luad_jcoRizvi_smoking,
+                                           m1Name = "APOBEC C>T", m2Name = "Smoking", minMut = 5)
+compare_JCO_apobecC2G_Smoking = mafCompare(m1=luad_jcoRizvi_apobec_C_G, m2=luad_jcoRizvi_smoking,
+                                           m1Name = "APOBEC C>G", m2Name = "Smoking", minMut = 5)
+compare_JCO_apobecC2G_C2T = mafCompare(m1=luad_jcoRizvi_apobec_C_G, m2=luad_jcoRizvi_apobec_C_T,
+                                           m1Name = "APOBEC C>G", m2Name = "APOBEC C>T", minMut = 5)
 
+print(compare_JCO_apobecC2T_Smoking)
 
-
-
-
+forestPlot(compare_JCO_apobecC2T_Smoking, pVal = 0.05, color=c("royalblue", "maroon"), geneFontSize = .8)
+forestPlot(compare_JCO_apobecC2G_Smoking, pVal = 0.05, color=c("royalblue", "maroon"), geneFontSize = .8)
+forestPlot(compare_JCO_apobecC2G_C2T, pVal = 0.05, color=c("royalblue", "maroon"), geneFontSize = .8)
 
 
 #---------- Analyses -----------#
