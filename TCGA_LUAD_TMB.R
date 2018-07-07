@@ -179,5 +179,15 @@ compareMutPlot(luad_merge7 %>% filter(TMB_Status2!="Mid"), group2="TMB_Status", 
 
 
 ###### Meta analysis
-p_load(altmeta)
-data("aex")
+hr    <- c(3.12, 1.15)
+ci.lb <- c(2.2, 1.03)
+ci.ub <- c(4.1, 2.6)
+meta  <- c(1,2)
+
+### log-transform hazard ratios and compute standard error based on the CI bounds 
+yi  <- log(hr) 
+sei <- (log(ci.ub) - log(ci.lb)) / (2*1.96)
+
+library(metafor)
+res <- rma(yi ~ factor(meta), sei=sei, method="FE") 
+res
