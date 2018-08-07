@@ -59,16 +59,20 @@ end
 
 metan coef lci uci, effect(Hazard Ratio) lcols(subgroup) by(group) null(1) xlabel(0, .5, 1, 1.5, 2)
 
+# default is fixed model
+metan coef lci uci, fixed effect(Hazard Ratio) lcols(subgroup) by(group) null(1) xlabel(0, .5, 1, 1.5, 2)
+metan coef lci uci, random effect(Hazard Ratio) lcols(subgroup) by(group) null(1) xlabel(0, .5, 1, 1.5, 2)
+
 # MELA
 clear
-input coef lci uci str20 subgroup str20 group
+input coef lci uci str20 subgroup str20 group                                                        
     0.4592 0.176 1.2 Snyder-2014 Male
     0.688 0.249 1.9  Snyder-2014 Female
     0.84 0.476 1.479 Allen-2015 Male
     0.481 0.204 1.136 Allen-2015 Female
 end
 
-metan coef lci uci, effect(Hazard Ratio) lcols(subgroup) by(group) null(1) xlabel(0, .5, 1, 1.5, 2)
+metan coef lci uci,  effect(Hazard Ratio) lcols(subgroup) by(group) null(1) xlabel(0, .5, 1, 1.5, 2)
 
 
 # construct examples: Deft approach 
@@ -81,7 +85,7 @@ clear all
 input hr ll ul str20 Dataset
 	0.356 0.0453 2.79 Rizvi-2015 
 	0.506 0.281  0.912 Rizvi-2018 
-	0.311 0.116  0.830 Hellmann-2018 
+	0.311 0.116  1.01 Hellmann-2018 
     end
 
 metan hr ll ul, effect(Mean Difference) lcols(Dataset) null(1) xlabel(0, .5, 1, 1.5, 2) favours(Favours greater effect of TMB-H in female # Favours greater effect of TMB-H in male)
