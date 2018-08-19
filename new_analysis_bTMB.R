@@ -106,13 +106,90 @@ fit = surv_fit(Surv(PFS, event = PFS.CNSR == 0) ~ MutationStatus,
 
 ggsurvplot(fit, pval = TRUE)
 cli_paper = cli_paper %>% 
-    mutate(MutationStatus = ifelse(as.numeric(btmb) > 16, "High", "Low"))
+    mutate(MutationStatus = ifelse(as.numeric(btmb) > 4*1.1, "High", "Low"))
+
+# cli_paper = cli_paper %>% 
+#     mutate(MutationStatus = ifelse(as.numeric(btmb) > 0, "High", "Low"))
 fit = surv_fit(Surv(PFS, event = PFS.CNSR == 0) ~ MutationStatus,
                data = cli_paper %>% filter(TRT01P!="Docetaxel"))
 
 ggsurvplot(fit, pval = TRUE)
 
+# forest plot
+cli_cox = cli_paper %>% 
+    mutate(nbTMB = as.numeric(btmb) / 1.1,
+           Age = BAGE,
+           Sex = factor(SEX, levels = c("M", "F")),
+           HIST = factor(HIST, levels = c("SQUAMOUS", "NON-SQUAMOUS")),
+           Smoking = factor(TOBHX, levels = c("NEVER", "PREVIOUS", "CURRENT")),
+           Treat = factor(TRT01P, levels = c("Docetaxel", "MPDL3280A")),
+           Mutation = factor(MutationStatus, levels = c("Low", "High")))
 
+fit = coxph(Surv(OS, OS.CNSR==0) ~ Age + Sex + HIST + Smoking + Treat + nbTMB, data = cli_cox)
+ggforest(fit)    
+fit = coxph(Surv(PFS, PFS.CNSR==0) ~ Age + Sex + HIST + Smoking + Treat + Mutation, data = cli_cox)
+ggforest(fit)
+
+fit = coxph(Surv(OS, OS.CNSR==0) ~ Age + Sex + HIST + Smoking + nbTMB,
+            data = cli_cox %>% filter(TRT01P!="Docetaxel"))
+ggforest(fit)    
+
+fit = coxph(Surv(OS, OS.CNSR==0) ~ Age + Sex + HIST + Smoking + Mutation,
+            data = cli_cox %>% filter(TRT01P!="Docetaxel"))
+ggforest(fit)  
+
+
+fit = coxph(Surv(OS, OS.CNSR==0) ~ Age + Sex + HIST + Smoking + nbTMB,
+            data = cli_cox %>% filter(TRT01P=="Docetaxel"))
+ggforest(fit)    
+
+fit = coxph(Surv(OS, OS.CNSR==0) ~ Age + Sex + HIST + Smoking + Mutation,
+            data = cli_cox %>% filter(TRT01P=="Docetaxel"))
+ggforest(fit)  
+
+# male vs female
+fit = coxph(Surv(OS, OS.CNSR==0) ~ Age + HIST + Smoking + Mutation,
+            data = cli_cox %>% filter(TRT01P=="Docetaxel", Sex == "M"))
+ggforest(fit)  
+
+fit = coxph(Surv(OS, OS.CNSR==0) ~ Age + HIST + Smoking + Mutation,
+            data = cli_cox %>% filter(TRT01P=="Docetaxel", Sex == "F"))
+ggforest(fit)  
+
+fit = coxph(Surv(PFS, PFS.CNSR==0) ~ Age + HIST + Smoking + Mutation,
+            data = cli_cox %>% filter(TRT01P=="Docetaxel", Sex == "M"))
+ggforest(fit)  
+
+fit = coxph(Surv(PFS, PFS.CNSR==0) ~ Age + HIST + Smoking + Mutation,
+            data = cli_cox %>% filter(TRT01P=="Docetaxel", Sex == "F"))
+ggforest(fit)  
+
+# 
+fit = coxph(Surv(OS, OS.CNSR==0) ~ Mutation,
+            data = cli_cox %>% filter(TRT01P=="Docetaxel", Sex == "M"))
+ggforest(fit)  
+
+fit = coxph(Surv(OS, OS.CNSR==0) ~ Mutation,
+            data = cli_cox %>% filter(TRT01P=="Docetaxel", Sex == "F"))
+ggforest(fit)  
+
+#
+fit = coxph(Surv(PFS, PFS.CNSR==0) ~ Mutation,
+            data = cli_cox %>% filter(TRT01P=="Docetaxel", Sex == "M"))
+ggforest(fit)  
+
+fit = coxph(Surv(PFS, PFS.CNSR==0) ~ Mutation,
+            data = cli_cox %>% filter(TRT01P=="Docetaxel", Sex == "F"))
+ggforest(fit) 
+
+
+fit = survfit(Surv(PFS, PFS.CNSR==0) ~ Mutation,
+            data = cli_cox %>% filter(TRT01P=="Docetaxel", Sex == "M"))
+ggsurvplot(fit, pval = TRUE)  
+
+fit = survfit(Surv(PFS, PFS.CNSR==0) ~ Mutation,
+              data = cli_cox %>% filter(TRT01P=="Docetaxel", Sex == "F"))
+ggsurvplot(fit, pval = TRUE) 
 
 ########### DCB definition
 # way1 
@@ -122,9 +199,11 @@ df = cli %>%
                BCOR == "CR" ~ "DCB",
                (BCOR %in% c("PR", "SD")) & PFS > 6 ~ "DCB",
                (BCOR == "PD") & PFS <= 6 ~ "NDB",
+               (BCOR %in% c("PR", "SD")) & PFS <= 6 ~"NDB",
                TRUE ~ NA_character_
                # TRUE ~ "NDB"
-           ))
+           ),
+           Clinical_Benefit = factor(Clinical_Benefit))
 # way2
 df = cli %>% 
     mutate(nbTMB = as.numeric(btmb)/1.1, 
@@ -161,7 +240,7 @@ df %>%
 
 
 
-df_2 = df %>% mutate(Cutoff = factor(ifelse(nbTMB > 16, "High", "Low"),
+df_2 = df %>% mutate(Cutoff = factor(ifelse(nbTMB > 4, "High", "Low"),
                                      levels = c("Low", "High") )) %>% 
     mutate(OS.event = ifelse(OS.CNSR == 0, 1, 0),
         PFS.event = ifelse(PFS.CNSR == 0, 1, 0),
@@ -215,63 +294,62 @@ surv_plot <- function(fit, ...){
 }
 
 ### NSCLC
-library(survminer)
-fit = surv_fit(Surv(OS, OS.event) ~ Cutoff, data = as.data.frame(df_2), group.by = "Gender")
-ggsurvplot_list(fit, data = df_2, pval = TRUE)
-
-
-fit1 <- survfit(Surv(OS, OS.event) ~ Cutoff,
-                      data = subset(df_2, Gender=="Male"))
-fit2 <- survfit(Surv(OS, OS.event) ~ Cutoff,
-                data = subset(df_2, Gender=="Female"))
-surv_plot(fit1, data = subset(df_2, Gender=="Male"))
-surv_plot(fit2, data = subset(df_2, Gender=="Female"))
-
-
-
-select_cf = function(x, method = "OS"){
-    df_2 = df %>%
-        filter(trial == "oak") %>% 
-        mutate(Cutoff = factor(ifelse(nbTMB > x, "High", "Low"),
-                                         levels = c("Low", "High") )) %>% 
-        mutate(OS.event = ifelse(OS.CNSR == 0, 1, 0),
-               PFS.event = ifelse(PFS.CNSR == 0, 1, 0),
-               Gender = case_when(
-                   SEX == "F" ~ "Female",
-                   SEX == "M" ~ "Male",
-                   TRUE ~ NA_character_)) %>% mutate(
-                       Gender = factor(Gender, levels = c("Male", "Female"))
-                   )
-    df_male = df_2 %>% filter(Gender == "Male")
-    df_female = df_2 %>% filter(Gender == "Female")
-    
-    if(method == "OS"){
-        fit1 <- survfit(Surv(OS, OS.event) ~ Cutoff,
-                        data = df_male)
-        fit2  <- survfit(Surv(OS, OS.event) ~ Cutoff,
-                         data = df_female)
-    }else{
-        fit1 <- survfit(Surv(PFS, PFS.event) ~ Cutoff,
-                        data = df_male)
-        fit2  <- survfit(Surv(PFS, PFS.event) ~ Cutoff,
-                         data = df_female)
-    }
-
-    p1 = list()
-    p1[[1]] = ggsurvplot(fit1, data = df_male, pval = TRUE)
-    p1[[2]] = ggsurvplot(fit2, data = df_female, pval = TRUE)
-    # p1[[1]] = surv_plot(fit1, data = df_male)
-    # p1[[2]] = surv_plot(fit2, data = df_female)
-    arrange_ggsurvplots(p1, print = TRUE,  ncol = 2, nrow = 1)
-    
-}
-
-select_cf(4, "PFS")
-select_cf(16, "PFS")
-
-
-select_cf(4)
-select_cf(16)
-
-surv_cutpoint(df_2 %>% filter(Gender=="Female"), "PFS", "PFS.event", variables = "nbTMB")
-surv_cutpoint(df_2 %>% filter(Gender=="Male"), "PFS", "PFS.event", variables = "nbTMB")
+# library(survminer)
+# # fit = surv_fit(Surv(OS, OS.event) ~ Cutoff, data = as.data.frame(df_2), group.by = "Gender")
+# # ggsurvplot_list(fit, data = df_2, pval = TRUE)
+# 
+# 
+# fit1 <- survfit(Surv(OS, OS.event) ~ Cutoff,
+#                       data = subset(df_2, Gender=="Male"))
+# fit2 <- survfit(Surv(OS, OS.event) ~ Cutoff,
+#                 data = subset(df_2, Gender=="Female"))
+# surv_plot(fit1, data = subset(df_2, Gender=="Male"))
+# surv_plot(fit2, data = subset(df_2, Gender=="Female"))
+# 
+# 
+# 
+# select_cf = function(x, method = "OS"){
+#     df_2 = df %>%
+#         mutate(Cutoff = factor(ifelse(nbTMB > x, "High", "Low"),
+#                                          levels = c("Low", "High") )) %>% 
+#         mutate(OS.event = ifelse(OS.CNSR == 0, 1, 0),
+#                PFS.event = ifelse(PFS.CNSR == 0, 1, 0),
+#                Gender = case_when(
+#                    SEX == "F" ~ "Female",
+#                    SEX == "M" ~ "Male",
+#                    TRUE ~ NA_character_)) %>% mutate(
+#                        Gender = factor(Gender, levels = c("Male", "Female"))
+#                    )
+#     df_male = df_2 %>% filter(Gender == "Male")
+#     df_female = df_2 %>% filter(Gender == "Female")
+#     
+#     if(method == "OS"){
+#         fit1 <- survfit(Surv(OS, OS.event) ~ Cutoff,
+#                         data = df_male)
+#         fit2  <- survfit(Surv(OS, OS.event) ~ Cutoff,
+#                          data = df_female)
+#     }else{
+#         fit1 <- survfit(Surv(PFS, PFS.event) ~ Cutoff,
+#                         data = df_male)
+#         fit2  <- survfit(Surv(PFS, PFS.event) ~ Cutoff,
+#                          data = df_female)
+#     }
+# 
+#     p1 = list()
+#     p1[[1]] = ggsurvplot(fit1, data = df_male, pval = TRUE)
+#     p1[[2]] = ggsurvplot(fit2, data = df_female, pval = TRUE)
+#     # p1[[1]] = surv_plot(fit1, data = df_male)
+#     # p1[[2]] = surv_plot(fit2, data = df_female)
+#     arrange_ggsurvplots(p1, print = TRUE,  ncol = 2, nrow = 1)
+#     
+# }
+# 
+# select_cf(4, "PFS")
+# select_cf(15, "PFS")
+# 
+# 
+# select_cf(4)
+# select_cf(15)
+# 
+# surv_cutpoint(df_2 %>% filter(Gender=="Female"), "PFS", "PFS.event", variables = "nbTMB")
+# surv_cutpoint(df_2 %>% filter(Gender=="Male"), "PFS", "PFS.event", variables = "nbTMB")
