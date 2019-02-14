@@ -3,7 +3,8 @@
 
 library(tidyverse)
 
-setwd("G:/biodata/immunotherapyDatasets/")
+# setwd("G:/biodata/immunotherapyDatasets/")
+setwd("/Volumes/data/biodata/immunotherapyDatasets/")
 
 # load NSCLC datasets
 load("Rdata/sampleInfo_cache.RData")
@@ -212,7 +213,7 @@ cs_nsclc_JCORizvi <- dyHR(sampleInfo_JCO_Rizvi)
 ggplot(cs_nsclc_JCORizvi, aes(x=cutoff, y=HR, color=Gender)) + geom_point() + geom_smooth()
 
 cs_nsclc_Hellmann <- dyHR(sampleInfo_Hellmann)
-ggplot(cs_nsclc_JCO, aes(x=cutoff, y=HR, color=Gender)) + geom_point() + geom_smooth()
+ggplot(cs_nsclc_Hellmann, aes(x=cutoff, y=HR, color=Gender)) + geom_point() + geom_smooth()
 
 save(cs_nsclc, cs_nsclc_Hellmann, cs_nsclc_JCORizvi, cs_nsclc_sciRizvi, file="Rdata/cache_HR_nsclc.RData")
 
