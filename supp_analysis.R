@@ -9,33 +9,11 @@ setwd("/Volumes/data/biodata/immunotherapyDatasets/")
 load("Rdata/sampleInfo_cache.RData")
 
 ################# Load data ###############################
-# load MELA datasets and transform them
-MELA_NEJM <- read_csv("MELA/MELA_NEJM.csv")
-MELA_Cell <- read_csv("MELA/MELA_Cell.csv")
-MELA_Science <- read_csv("MELA/MELA_Science.csv")
-
-MELA_NEJM <- MELA_NEJM %>% 
-    mutate(Gender = ifelse(Gender == "F", "Female", "Male"), 
-           OS = OS_Year * 12, 
-           Event = OS_Status)
-
-# MELA_Cell <- MELA_Cell %>% 
-#     mutate(Gender = ifelse(Gender == "F", "Female", "Male"),
-#            OS = OS_Day / 30, 
-#            Event = ifelse(OS_Status=="Dead", 1, 0))
-
-MELA_Science <- MELA_Science %>% 
-    mutate(Gender = ifelse(Gender == "female", "Female", "Male"),
-           OS = OS_Day / 30, 
-           Event = OS_Status)
-
-MELA_Science <- filter(MELA_Science, group != "long-survival")
-
 
 # Unify the Tumor Mutation Burden to nonsynonymous mutation/MB
-sampleInfo_Forde    <-  sampleInfo_Forde %>% 
-    mutate(sTMB = TMB_NonsynSNP / 30, 
-           sNeo = NeoCounts / 30)
+# sampleInfo_Forde    <-  sampleInfo_Forde %>% 
+#     mutate(sTMB = TMB_NonsynSNP / 30, 
+#            sNeo = NeoCounts / 30)
 sampleInfo_Hellmann <-  sampleInfo_Hellmann %>% 
     mutate(sTMB = TMB_NonsynSNP / 30, 
            sNeo = NeoCounts / 30)
