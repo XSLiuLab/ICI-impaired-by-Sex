@@ -277,7 +277,7 @@ tableData <- function(dataset){
     return(res)
 }
 
-tb_sci_Rizvi <-  tableData(sampleInfo_Sci_Rizvi)
+tb_sci_Rizvi <-  tableData(sampleInfo_Sci_Rizvi) # 3 with NR removed
 tb_jco_Rizvi <-  tableData(sampleInfo_JCO_Rizvi)
 tb_Hellmann  <-  tableData(sampleInfo_Hellmann)
 

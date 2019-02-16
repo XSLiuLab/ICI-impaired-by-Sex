@@ -11,36 +11,46 @@ load("Rdata/sampleInfo_cache.RData")
 ################# Load data ###############################
 
 # Unify the Tumor Mutation Burden to nonsynonymous mutation/MB
-# sampleInfo_Forde    <-  sampleInfo_Forde %>% 
-#     mutate(sTMB = TMB_NonsynSNP / 30, 
-#            sNeo = NeoCounts / 30)
 sampleInfo_Hellmann <-  sampleInfo_Hellmann %>% 
-    mutate(sTMB = TMB_NonsynSNP / 30, 
-           sNeo = NeoCounts / 30)
+    mutate(sTMB = TMB_NonsynSNP / 30)
 sampleInfo_Sci_Rizvi <- sampleInfo_Sci_Rizvi %>% 
-    mutate(sTMB = TMB_NonsynSNP / 30, 
-           sNeo = NeoCounts / 30)
-# 0.98, 1.06 and 1.22 megabases in the 341-, 410- and 468- gene panels, respectively
+    mutate(sTMB = TMB_NonsynSNP / 30)
+# 0.98, 1.06 and 1.22 megabases in 
+# the 341-, 410- and 468- gene panels, respectively
 sampleInfo_JCO_Rizvi <- sampleInfo_JCO_Rizvi %>% 
     mutate(sTMB = ifelse(Gene_Panel == "IMPACT341", TMB_NonsynSNP / 0.98,
                          ifelse(Gene_Panel == "IMPACT410", 
                                 TMB_NonsynSNP / 1.06, TMB_NonsynSNP / 1.22)))
 
-############# Cutoff analysis
+sel_cols = c("Tumor_Sample_Barcode", "Age", "Gender", "Smoking_History",
+             "PFS_Months", "PFS_Event", "Clinical_Benefit", "sTMB", "dataset")
+
+nsclc =  bind_rows(
+    select_at(mutate(sampleInfo_Hellmann, dataset="Hellmann 2018"), sel_cols),
+    select_at(mutate(sampleInfo_JCO_Rizvi, dataset="Rizvi 2018"), sel_cols),
+    select_at(mutate(sampleInfo_Sci_Rizvi, dataset="Rizvi 2015"), sel_cols)
+) %>% mutate(
+    Smoking_History = case_when(
+        Smoking_History %in% c("never", "Never") ~ "Never",
+        TRUE ~ "Current/former"
+    )
+)
+
+table(nsclc$Gender)
+table(nsclc$Smoking_History)
+table(nsclc$PFS_Event)
+table(nsclc$Clinical_Benefit)
+
+# basic summary based on variable like sex
+summary(filter(nsclc, Gender=="Female"))
+
+# Cutoff analysis
 library(survival)
 library(survminer)
-colm <- c("sTMB", "Clinical_Benefit", "Gender")
-nsclc <- rbind(sampleInfo_Hellmann[, c(colm, "PFS_Months", "PFS_Event")],
-               sampleInfo_JCO_Rizvi[, c(colm, "PFS_Months", "PFS_Event")], 
-               sampleInfo_Sci_Rizvi[, c(colm, "PFS_Months", "PFS_Event")])
-
-quantile(nsclc[nsclc$Gender=="Female", "sTMB"], probs = seq(0, 1, 0.1))
-quantile(nsclc[nsclc$Gender=="Male", "sTMB"], probs = seq(0, 1, 0.1))
-quantile(nsclc[, "sTMB"], probs = seq(0, 1, 0.1))
 
 dyHR <- function(data, time="PFS_Months", event="PFS_Event"){
     data <- as.data.frame(data)
-    male <- subset(data, Gender=="Male")
+    male <- subset(data, Gender == "Male")
     female <- subset(data, Gender == "Female")
     ms_male <- sort(male[, "sTMB"])
     ms_female <- sort(female[, "sTMB"])
@@ -76,28 +86,28 @@ dyHR <- function(data, time="PFS_Months", event="PFS_Event"){
 
 cs_nsclc <- dyHR(nsclc)
 
+library(cowplot)
+ggplot(cs_nsclc, aes(x=cutoff, y=HR, color=Gender)) + 
+    geom_point() + geom_line() + xlim(c(20,0)) + xlab("TMB Cutoff") 
 
-## use cutoff to determine HR
+## use cutoff 17 to determine HR
 
 # NSCLC
-nsclc <- nsclc %>% mutate(Cutoff = factor(ifelse(sTMB > 4, "High", "Low"),
+nsclc <- nsclc %>% mutate(Cutoff = factor(ifelse(sTMB > 16, "High", "Low"),
                                           levels = c("Low", "High") ))
-nsclc$dataset = c(rep("Hellmann 2018", nrow(sampleInfo_Hellmann)),
-                  rep("Rizvi 2018", nrow(sampleInfo_JCO_Rizvi)),
-                  rep("Rizvi 2015", nrow(sampleInfo_Sci_Rizvi)))
 
 summary(coxph(Surv(PFS_Months, PFS_Event) ~ Cutoff,
               data = subset(nsclc, Gender=="Male")))
 summary(coxph(Surv(PFS_Months, PFS_Event) ~ Cutoff,
               data = subset(nsclc, Gender=="Female")))
 
-sampleInfo_Sci_Rizvi <- sampleInfo_Sci_Rizvi %>% mutate(Cutoff = factor(ifelse(sTMB > 4, 
+sampleInfo_Sci_Rizvi <- sampleInfo_Sci_Rizvi %>% mutate(Cutoff = factor(ifelse(sTMB > 16, 
                                                                                "High", "Low"),
                                                                         levels = c("Low", "High") ))
-sampleInfo_JCO_Rizvi <- sampleInfo_JCO_Rizvi %>% mutate(Cutoff = factor(ifelse(sTMB > 4, 
+sampleInfo_JCO_Rizvi <- sampleInfo_JCO_Rizvi %>% mutate(Cutoff = factor(ifelse(sTMB > 16, 
                                                                                "High", "Low"),
                                                                         levels = c("Low", "High") ))
-sampleInfo_Hellmann <- sampleInfo_Hellmann %>% mutate(Cutoff = factor(ifelse(sTMB > 4, 
+sampleInfo_Hellmann <- sampleInfo_Hellmann %>% mutate(Cutoff = factor(ifelse(sTMB > 16, 
                                                                              "High", "Low"),
                                                                       levels = c("Low", "High") ))
 
