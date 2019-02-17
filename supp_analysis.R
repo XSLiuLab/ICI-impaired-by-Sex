@@ -43,6 +43,9 @@ table(nsclc$Clinical_Benefit)
 
 # basic summary based on variable like sex
 summary(filter(nsclc, Gender=="Female"))
+summary(filter(nsclc, Gender=="Male"))
+
+table(nsclc$Gender, nsclc$Clinical_Benefit)
 
 # Cutoff analysis
 library(survival)
@@ -87,13 +90,17 @@ dyHR <- function(data, time="PFS_Months", event="PFS_Event"){
 cs_nsclc <- dyHR(nsclc)
 
 library(cowplot)
-ggplot(cs_nsclc, aes(x=cutoff, y=HR, color=Gender)) + 
-    geom_point() + geom_line() + xlim(c(20,0)) + xlab("TMB Cutoff") 
+p = ggplot(cs_nsclc, aes(x=cutoff, y=HR, color=Gender)) + 
+    geom_point() + geom_line() + xlim(c(20,0)) + xlab("TMB Cutoff") +
+    scale_color_manual(values = c("red", "blue"))
 
+save_plot("/Volumes/paper/backup/data/neoQ/HR_vs_TMBcutoff.pdf", p, base_aspect_ratio = 1.4)
 ## use cutoff 17 to determine HR
 
 # NSCLC
 nsclc <- nsclc %>% mutate(Cutoff = factor(ifelse(sTMB > 16, "High", "Low"),
+                                          levels = c("Low", "High") ))
+nsclc <- nsclc %>% mutate(Cutoff = factor(ifelse(sTMB > 4, "High", "Low"),
                                           levels = c("Low", "High") ))
 
 summary(coxph(Surv(PFS_Months, PFS_Event) ~ Cutoff,
@@ -153,57 +160,48 @@ tb_Hellmann$female %>% fisher.test()
 
 surv_plot <- function(fit){
     p <- ggsurvplot(fit, 
-                    font.tickslab=14,
-                    # legend="right", 
+                    font.tickslab=12,
                     legend.title = "",
-                    legend.labs = c("Low", "High"),
+                    legend.labs = c("TMB-Low", "TMB-High"),
                     palette = c("#0000FF", "#FF0000"),
                     risk.table = TRUE,
                     pval = TRUE,
                     pval.coord = c(1, 0.05),
                     surv.scale = "percent",
                     break.time.by = 5,
-                    axes.offset = FALSE,
-                    xlab="",
-                    ylab="",
+                    axes.offset = TRUE,
+                    xlab="Months",
+                    ylab="Percent progression-free",
                     # ggtheme=theme_wsx,
                     # tables.theme = theme_wsx,
                     xlim = c(0, fit$time+5),
-                    legend="none",
+                    legend = c(0.8, 0.8),
                     risk.table.height = 0.35,
                     fontsize=7,
                     pval.size = 6)
     ggpar(
         p,
-        font.xtickslab = 20,
-        font.ytickslab = 20 
+        font.xtickslab = 15,
+        font.ytickslab = 15 
     )
 }
 
 ### NSCLC
 fit1 <- survfit(Surv(PFS_Months, PFS_Event) ~ Cutoff, 
-                data=sampleInfo_Sci_Rizvi %>% filter(Gender=="Male"))
+                data=nsclc %>% filter(Gender=="Male"))
 fit2 <- survfit(Surv(PFS_Months, PFS_Event) ~ Cutoff, 
-                data=sampleInfo_Sci_Rizvi %>% filter(Gender=="Female"))
-fit3 <- survfit(Surv(PFS_Months, PFS_Event) ~ Cutoff, 
-                data=sampleInfo_JCO_Rizvi %>% filter(Gender=="Male"))
-fit4 <- survfit(Surv(PFS_Months, PFS_Event) ~ Cutoff, 
-                data=sampleInfo_JCO_Rizvi %>% filter(Gender=="Female"))
-fit5 <- survfit(Surv(PFS_Months, PFS_Event) ~ Cutoff, 
-                data=sampleInfo_Hellmann %>% filter(Gender=="Male"))
-fit6 <- survfit(Surv(PFS_Months, PFS_Event) ~ Cutoff, 
-                data=sampleInfo_Hellmann %>% filter(Gender=="Female"))
+                data=nsclc %>% filter(Gender=="Female"))
+
 
 surv1_1 <- surv_plot(fit1)
 surv1_2 <- surv_plot(fit2)
-surv1_3 <- surv_plot(fit3)
-surv1_4 <- surv_plot(fit4)
-surv1_5 <- surv_plot(fit5)
-surv1_6 <- surv_plot(fit6)
+
+surv1_1
+surv1_2
 
 
-p4_1 <- plotROC(nsclc, sTMB, Clinical_Benefit, Gender) + 
-    scale_color_manual(values = my_palette) + add_modify
+arrange_ggsurvplots(list(surv1_1, surv1_2))
+res = arrange_ggsurvplots(list(surv1_1, surv1_2), print = FALSE)
 
-ggsave("Figures/CompareROC-NSCLC-ALL.pdf", plot = p5_1, width = 4, height = 3)
+ggsave("/Volumes/paper/backup/data/neoQ/KMplot_TMBcutoff16.pdf", res, width = 12, height = 6)
 
