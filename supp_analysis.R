@@ -90,11 +90,14 @@ dyHR <- function(data, time="PFS_Months", event="PFS_Event"){
 cs_nsclc <- dyHR(nsclc)
 
 library(cowplot)
-p = ggplot(cs_nsclc, aes(x=cutoff, y=HR, color=Gender)) + 
-    geom_point() + geom_line() + xlim(c(20,0)) + xlab("TMB Cutoff") +
-    scale_color_manual(values = c("red", "blue"))
-
-save_plot("/Volumes/paper/backup/data/neoQ/HR_vs_TMBcutoff.pdf", p, base_aspect_ratio = 1.4)
+cs_nsclc2 = dplyr::filter(cs_nsclc, cutoff>=1 & cutoff<=20)
+p = ggplot(cs_nsclc2, aes(x=cutoff, y=HR, color=Gender)) + 
+    geom_line() + xlab("TMB Cutoff") + ylab("Hazard Ratio") +
+    coord_cartesian(xlim = c(1,20)) +  
+    scale_color_manual(values = c("red", "blue")) + 
+    scale_x_continuous(breaks = c(1, 5, 10, 15, 20))
+p
+save_plot("/Volumes/paper/backup/data/neoQ/HR_vs_TMBcutoff2.pdf", p, base_aspect_ratio = 1.4)
 ## use cutoff 17 to determine HR
 
 # NSCLC
