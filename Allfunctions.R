@@ -352,3 +352,51 @@ calcROC <- function(.data, predict_var, target, group_var, positive="DCB"){
     dat <- base::Reduce(rbind, total_res)
     return(dat)
 }
+
+plotROC <- function(.data, predict_col, target, group, positive="DCB", all=TRUE){
+    if(!(require(tidyverse) & require(plotROC))){
+        stop("--> tidyverse and plotROC packages are required..")
+    } 
+    
+    predict_col <- enquo(predict_col)
+    target <- enquo(target)
+    group  <- enquo(group)
+    
+    predictN <- quo_name(predict_col)
+    groupN   <- quo_name(group)
+    
+    df <- .data %>% dplyr::select(!! predict_col, !! target, !! group) %>%
+        mutate(targetN = ifelse(!! target == positive, 1, 0)) %>% as.data.frame()
+    
+    df2 <- df 
+    df2[, groupN] <- "ALL"
+    
+    df <- rbind(df, df2)
+    
+    p  <- df %>%  ggplot(aes_string(m = predictN, 
+                                    d = "targetN",
+                                    color = groupN)) + geom_roc(show.legend = TRUE, labels=FALSE)
+    p <- p + ggpubr::theme_classic2()
+    
+    # p <- direct_label(p) + ggpubr::theme_classic2()
+    # annotate("text", x = .75, y = .25, 
+    #          label = paste("AUC =", round(calc_auc(basicplot)$AUC, 2)))
+    # pairplot <- ggplot(longtest, aes(d = D, m = M, color = name)) + 
+    #     geom_roc(show.legend = FALSE) + style_roc()
+    # direct_label(pairplot)
+    
+    ng <- levels(factor(df[, groupN]))
+    if(length(ng) == 3){
+        auc <- calc_auc(p)$AUC
+        names(auc) <- ng
+        auc <- base::sort(auc, decreasing = TRUE)
+        p <- p + annotate("text", x = .75, y = .25, 
+                          label = paste(names(auc)[1], " AUC =", round(auc[1], 3), "\n",
+                                        names(auc)[2], " AUC =", round(auc[2], 3), "\n",
+                                        names(auc)[3], " AUC =", round(auc[3], 3), "\n"),
+                          size = 2)
+    }
+    
+    p + xlab("1 - Specificity") + ylab("Sensitivity") + 
+        scale_x_continuous(expand = c(0, 0)) + scale_y_continuous(expand = c(0, 0))
+}

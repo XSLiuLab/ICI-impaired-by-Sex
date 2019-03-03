@@ -59,8 +59,41 @@ MELA_Science <- MELA_Science %>% mutate(Clinical_Benefit = ifelse(group == "resp
 # save(MELA_NEJM, MELA_Science, sampleInfo_Forde, sampleInfo_Hellmann, sampleInfo_JCO_Rizvi,
 #      sampleInfo_Sci_Rizvi, file="Rdata/cache_Unify_sampleinfo.RData")
 
+setwd("/home/wsx/Downloads/neoQ")
 ############### Compare sTMB (standardized Tumor Mutation Burden) ######################
 # library(RColorBrewer)
+
+################# New Figure
+
+library(cowplot)
+
+benefit_info = 
+    dplyr::bind_rows(
+        dplyr::select(dplyr::mutate(sampleInfo_Sci_Rizvi, Study="Rizvi 2015"), Gender, Clinical_Benefit, sTMB, Study) %>% dplyr::filter(Clinical_Benefit %in% c("DCB", "NDB")),
+        dplyr::select(dplyr::mutate(sampleInfo_Hellmann, Study="Hellmann 2018"), Gender, Clinical_Benefit, sTMB, Study),
+        dplyr::select(dplyr::mutate(sampleInfo_JCO_Rizvi, Study="Rizvi 2018"), Gender, Clinical_Benefit, sTMB, Study),
+        dplyr::filter(dplyr::select(dplyr::mutate(sampleInfo_JCO_Rizvi, Study="Rizvi 2018 -341"), Gender, Clinical_Benefit, sTMB, Gene_Panel, Study), Gene_Panel=="IMPACT341") %>% dplyr::select(-Gene_Panel),
+        dplyr::filter(dplyr::select(dplyr::mutate(sampleInfo_JCO_Rizvi, Study="Rizvi 2018 -410"), Gender, Clinical_Benefit, sTMB, Gene_Panel, Study), Gene_Panel=="IMPACT410") %>% dplyr::select(-Gene_Panel)
+    )
+
+benefit_info$Study = factor(benefit_info$Study, 
+                            levels = c("Rizvi 2015", "Hellmann 2018", "Rizvi 2018",
+                                       "Rizvi 2018 -341", "Rizvi 2018 -410"))
+dodge <- position_dodge(width = 0.9)
+p = ggplot(benefit_info, aes(x=Gender, y=sTMB, fill=Clinical_Benefit)) +
+    geom_boxplot(outlier.shape = 1, outlier.size = 0.5) +
+    scale_fill_brewer(palette="RdBu") + 
+    stat_compare_means(aes_string(group="Clinical_Benefit"), label = "p.format", 
+                       method = "wilcox.test") + ylab("TMB (mutations per MB)") + 
+    facet_wrap(~Study, scales = "free_y") + theme(legend.position = c(0.7, 0.2), axis.title.x = element_blank()) + 
+    labs(fill = "Clinical Benefit")
+save_plot(
+    "boxplot_vs.pdf", plot = p, base_height = 6, base_aspect_ratio = 1.6
+)
+
+#########################
+
+
 
 p1_1 <- compareMutPlot(subset(sampleInfo_Sci_Rizvi, Clinical_Benefit %in% c("DCB", "NDB")), value = "sTMB") 
 p1_2 <- compareMutPlot(sampleInfo_Hellmann, value="sTMB")
@@ -82,6 +115,8 @@ ggsave("Figures/CompareMut-MELA-NEJM.pdf", plot = p1_7, width = 4, height = 3)
 ggsave("Figures/CompareMut-MELA-Science.pdf", plot = p1_8, width = 4, height = 3)
 
 ############ Compare ROC ################################
+
+
 my_palette <- c("black", "red", "blue")
 add_modify <- theme(axis.line = element_line(colour = 'black', size = 1.0),
                     axis.ticks = element_line(colour = "black", size = 1.0))
@@ -235,6 +270,118 @@ nsclc <- nsclc %>% mutate(Cutoff = factor(ifelse(sTMB > 4, "High", "Low"),
 nsclc$dataset = c(rep("Hellmann 2018", nrow(sampleInfo_Hellmann)),
                   rep("Rizvi 2018", nrow(sampleInfo_JCO_Rizvi)),
                   rep("Rizvi 2015", nrow(sampleInfo_Sci_Rizvi)))
+
+## NEW figures for ROC comparison ################################
+library(pROC)
+
+roc_df = dplyr::select(nsclc, c(Gender, Smoking_History, Clinical_Benefit, sTMB, dataset))
+roc_df$response = ifelse(roc_df$Clinical_Benefit=="DCB", 1, 0)
+
+do_roc = function(df, study) {
+    library(pROC)
+    df_f = subset(df, Gender == "Female")
+    df_m = subset(df, Gender == "Male")
+    roc_f = roc(df_f$response, df_f$sTMB, direction = "<")
+    roc_m = roc(df_m$response, df_m$sTMB, direction = "<")
+    roc_a = roc(df$response, df$sTMB, direction = "<")
+    roc_l = list(Female=roc_f, Male=roc_m, ALL=roc_a)
+    
+    message("AUC for female: ", auc(roc_f))
+    message("AUC for male: ", auc(roc_m))
+    message("AUC for all: ", auc(roc_a))
+    
+    ggroc(roc_l, legacy.axes = TRUE) -> p1
+    
+    return(data.frame(specificity = p1$data$specificity,
+                      sensitivity = p1$data$sensitivity,
+                      group = p1$data$name,
+                      study = study))
+}
+
+roc_list = list()
+roc_list[["Rizvi_2015"]] = do_roc(subset(roc_df, dataset=="Rizvi 2015"), study = "Rizvi 2015")
+roc_list[["Hellmann_2018"]] = do_roc(subset(roc_df, dataset=="Hellmann 2018"), study = "Hellmann 2018")
+roc_list[["Rizvi_2018"]] = do_roc(subset(roc_df, dataset=="Rizvi 2018"), study = "Rizvi 2018")
+roc_list[["NSCLC_combined"]] = do_roc(roc_df, study = "NSCLC combined")
+# This data need to be corrected,
+# ALL  0.629
+# Male 0.563
+# Female 0.686
+
+sampleInfo_JCO_Rizvi$response = ifelse(sampleInfo_JCO_Rizvi$Clinical_Benefit=="DCB", 1, 0)
+roc_list[["Rizvi_2018_341"]] = do_roc(subset(sampleInfo_JCO_Rizvi, Gene_Panel=="IMPACT341"), study = "Rizvi 2018 -341")
+roc_list[["Rizvi_2018_410"]] = do_roc(subset(sampleInfo_JCO_Rizvi, Gene_Panel=="IMPACT410"), study = "Rizvi 2018 -410")
+
+
+# ROC ALL
+roc_all = dplyr::rbind_list(roc_list)
+roc_all$study = factor(roc_all$study, 
+                       levels = c("Rizvi 2015", "Hellmann 2018", "Rizvi 2018",
+                                "Rizvi 2018 -341", "Rizvi 2018 -410", "NSCLC combined"))
+roc_all$group = factor(roc_all$group, 
+                       levels = c("Male", "ALL", "Female"))
+ggplot(roc_all, aes(x=1-specificity, y=sensitivity, linetype=group, color=group)) +
+    geom_line() + scale_color_manual(values = c("blue", "black", "red")) +  
+    facet_wrap(~study) + labs(linetype="", color="") -> p2
+
+save_plot(
+    "ROC_ALL.pdf", plot = p2, base_height = 6, base_aspect_ratio = 1.6
+)
+
+# ROC Smoking
+# sampleInfo_Sci_Rizvi$response = ifelse(sampleInfo_Sci_Rizvi$Clinical_Benefit=="DCB", 1, 0)
+# sampleInfo_Hellmann$response = ifelse(sampleInfo_Hellmann$Clinical_Benefit=="DCB", 1, 0)
+
+roc_list2 = list()
+roc_list2[["Rizvi_2015"]] = do_roc(subset(roc_df, 
+                                          dataset=="Rizvi 2015" & 
+                                              Smoking_History=="Current/former"),
+                                   study = "Rizvi 2015 smoker")
+roc_list2[["Hellmann_2018"]] = do_roc(subset(roc_df, 
+                                          dataset=="Hellmann 2018" & 
+                                              Smoking_History=="Current/former"),
+                                   study = "Hellmann 2018 smoker")
+roc_list2[["Rizvi_2018"]] = do_roc(sampleInfo_JCO_Rizvi %>% 
+                                       dplyr::mutate(Smoke=ifelse(Smoking_History == "Never", 
+                                                           "Never", "Current/former")) %>% 
+                                       dplyr::filter(Smoke == "Current/former", 
+                                                     Gene_Panel=="IMPACT410"),
+                                   study = "Rizvi 2018 smoker")
+roc_list2[["Rizvi_2018_nonsmoker"]] = do_roc(sampleInfo_JCO_Rizvi %>% 
+                                       dplyr::mutate(Smoke=ifelse(Smoking_History == "Never", 
+                                                                  "Never", "Current/former")) %>% 
+                                       dplyr::filter(Smoke == "Never", 
+                                                     Gene_Panel=="IMPACT410"),
+                                   study = "Rizvi 2018 non-smoker")
+
+
+roc_smoke = dplyr::rbind_list(roc_list2)
+roc_smoke$study = factor(roc_smoke$study, 
+                       levels = c("Rizvi 2015 smoker", "Hellmann 2018 smoker", 
+                                  "Rizvi 2018 smoker", "Rizvi 2018 non-smoker"))
+roc_smoke$group = factor(roc_smoke$group, 
+                       levels = c("Male", "ALL", "Female"))
+ggplot(roc_smoke %>% dplyr::filter(study!="Rizvi 2018 non-smoker"),
+       aes(x=1-specificity, y=sensitivity, linetype=group, color=group)) +
+    geom_line() + scale_color_manual(values = c("blue", "black", "red")) +  
+    facet_wrap(~study, ncol = 3) + labs(linetype="", color="") +
+    theme(legend.position = "none") -> p3
+
+save_plot(
+    "ROC_smoker.pdf", plot = p3, base_height = 3, base_aspect_ratio = 2.5
+)
+
+ggplot(roc_smoke %>% dplyr::filter(study=="Rizvi 2018 non-smoker"),
+       aes(x=1-specificity, y=sensitivity, linetype=group, color=group)) +
+    geom_line() + scale_color_manual(values = c("blue", "black", "red")) +  
+    facet_wrap(~study) + labs(linetype="", color="") +
+    theme(legend.position = "none") -> p4
+
+save_plot(
+    "ROC_nonsmoker.pdf", plot = p4, base_height = 3, base_aspect_ratio = 1.1
+)
+
+###############################################
 
 summary(coxph(Surv(PFS_Months, PFS_Event) ~ Cutoff,
               data = subset(nsclc, Gender=="Male")))
@@ -465,8 +612,8 @@ p5_1 <- plotROC(mela, sTMB, Clinical_Benefit, Gender) +
 ggsave("Figures/CompareROC-MELA-NEJM.pdf", plot = p3_1, width = 4, height = 3)
 ggsave("Figures/CompareROC-MELA-Science.pdf", plot = p3_2, width = 4, height = 3)
 
-ggsave("Figures/CompareROC-MELA-ALL.pdf", plot = p4_1, width = 4, height = 3)
-ggsave("Figures/CompareROC-NSCLC-ALL.pdf", plot = p5_1, width = 4, height = 3)
+ggsave("Figures/CompareROC-MELA-ALL.pdf", plot = p5_1, width = 4, height = 3)
+ggsave("Figures/CompareROC-NSCLC-ALL.pdf", plot = p4_1, width = 4, height = 3)
 
  # plotROC(sampleInfo_Sci_Rizvi, sTMB, Clinical_Benefit, Gender)
 # plotROC(sampleInfo_JCO_Rizvi, sTMB, Clinical_Benefit, Gender)
